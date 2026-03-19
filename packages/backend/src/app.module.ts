@@ -57,10 +57,15 @@ import { MailModule } from './modules/mail/mail.module';
       }),
     }),
 
-    // Serve admin panel static files (from dist/public)
+    // Serve admin panel static files
+    // - production (Docker): dist/public/  (admin out copied there at build)
+    // - development:         packages/admin/out/
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, 'public'),
-      exclude: ['/api*'],
+      rootPath: process.env.NODE_ENV === 'production'
+        ? join(__dirname, 'public')
+        : join(__dirname, '../../admin/out'),
+      exclude: ['/api*', '/socket.io*'],
+      serveStaticOptions: { fallthrough: true },
     }),
 
     // Feature modules

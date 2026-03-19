@@ -23,6 +23,7 @@ async function bootstrap() {
   // Security headers
   app.use(helmet.default({
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow media files
+    contentSecurityPolicy: false, // Next.js static export uses inline scripts
   }));
 
   // Compression

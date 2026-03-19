@@ -14,8 +14,8 @@ export interface DeviceConfig {
 }
 
 const defaultConfig: DeviceConfig = {
-  apiUrl: 'http://pedrazaviajes.dyndns.org:5050',
-  wsUrl: 'ws://pedrazaviajes.dyndns.org:5050',
+  apiUrl: 'http://localhost:3001',
+  wsUrl: 'ws://localhost:3001',
 };
 
 export const platform = {

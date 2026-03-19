@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "start": "pnpm build:admin && pnpm --filter backend dev",
     "dev": "concurrently \"pnpm --filter backend dev\" \"pnpm --filter admin dev\"",
     "dev:backend": "pnpm --filter backend dev",
     "dev:admin": "pnpm --filter admin dev",
