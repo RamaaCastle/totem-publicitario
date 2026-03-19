@@ -59,7 +59,7 @@ import { MailModule } from './modules/mail/mail.module';
 
     // Serve admin panel static files (from dist/public)
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
+      rootPath: join(__dirname, 'public'),
       exclude: ['/api/(.*)'],
       serveStaticOptions: {
         index: 'index.html',
