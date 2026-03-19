@@ -10,9 +10,8 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/admin/package.json    ./packages/admin/
-COPY packages/player/package.json   ./packages/player/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter backend --filter admin
 
 # Copy source code
 COPY packages/backend ./packages/backend
