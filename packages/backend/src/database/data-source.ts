@@ -2,11 +2,10 @@ import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { join } from 'path';
 
-dotenv.config({ path: join(__dirname, '../../../../.env') });
-dotenv.config({ path: join(__dirname, '../../../.env') });
-dotenv.config({ path: join(__dirname, '../../.env') });
+// Load .env from dist/backend/ (parent of database/ dir)
 dotenv.config({ path: join(__dirname, '../.env') });
-dotenv.config({ path: join(__dirname, '.env') });
+// Fallback for running from source
+dotenv.config({ path: join(__dirname, '../../../../.env') });
 
 export const AppDataSource = new DataSource({
   type: 'mysql',

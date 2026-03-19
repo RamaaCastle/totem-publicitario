@@ -17,10 +17,15 @@ pnpm install --frozen-lockfile
 echo "🔨 Compilando..."
 node scripts/build-prod.js
 
-# 4. Reiniciar PM2
+# 4. Instalar dependencias de producción
+echo "📦 Instalando dependencias de producción..."
+cd dist/backend && npm install --omit=dev && cd ../..
+
+# 5. Reiniciar PM2
 echo "♻️  Reiniciando servicios..."
-pm2 restart ecosystem.config.js --env production 2>/dev/null || \
-  pm2 start dist/ecosystem.config.js --env production
+cd dist/backend && pm2 restart signage-backend --update-env 2>/dev/null || \
+  pm2 start main.js --name signage-backend
+cd ../..
 
 pm2 save
 

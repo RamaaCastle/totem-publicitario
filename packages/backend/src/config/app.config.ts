@@ -5,7 +5,7 @@ export default registerAs('app', () => ({
   name: process.env.APP_NAME || 'Signage Platform',
   url: process.env.APP_URL || 'http://localhost:3000',
   apiUrl: process.env.API_URL || 'http://localhost:3001',
-  port: parseInt(process.env.BACKEND_PORT || '3001', 10) || 3001,
+  port: parseInt(process.env.BACKEND_PORT || process.env.PORT || '5050', 10),
   host: process.env.BACKEND_HOST || '0.0.0.0',
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
   uploadDir: process.env.UPLOAD_DIR || './uploads',
