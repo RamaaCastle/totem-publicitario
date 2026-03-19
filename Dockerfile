@@ -28,7 +28,7 @@ RUN pnpm --filter admin build
 RUN pnpm --filter backend build
 
 # Create clean production deploy folder (resolves pnpm symlinks)
-RUN pnpm --filter backend deploy --prod /deploy
+RUN pnpm --filter backend deploy --prod --legacy /deploy
 
 # Copy admin static files into backend's public folder
 RUN cp -r packages/admin/out /deploy/dist/public
