@@ -4,5 +4,7 @@
 **/dist
 **/.env
 **/.env.local
-**/android
-packages/player
+packages/player/src
+packages/player/android
+packages/player/scripts
+packages/player/test-electron.js

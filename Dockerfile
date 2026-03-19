@@ -7,11 +7,12 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy workspace manifests first (for layer caching)
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/admin/package.json    ./packages/admin/
+COPY packages/player/package.json   ./packages/player/
 
-RUN pnpm install --frozen-lockfile --filter backend --filter admin
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY packages/backend ./packages/backend
