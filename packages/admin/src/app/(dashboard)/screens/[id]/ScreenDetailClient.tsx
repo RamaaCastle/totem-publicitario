@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDropzone } from 'react-dropzone';
 import {
@@ -41,7 +41,10 @@ function getArgDateLabel(offsetDays = 0): string {
 }
 
 export default function ScreenDetailClient({ params }: { params: { id: string } }) {
-  const { id } = params;
+  const urlParams = useParams();
+  // useParams() reads the real URL in the browser (works for both hard refresh and client nav)
+  // Falls back to props for SSR/build time
+  const id = (urlParams?.id as string) || params.id;
   const router = useRouter();
   const queryClient = useQueryClient();
   const { selectedOrg } = useOrgStore();

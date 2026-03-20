@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, Trash2, Save, Film, Image as ImageIcon, Clock } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 
 export default function PlaylistEditClient({ params }: { params: { id: string } }) {
-  const { id } = params;
+  const urlParams = useParams();
+  const id = (urlParams?.id as string) || params.id;
   const router = useRouter();
   const queryClient = useQueryClient();
 
