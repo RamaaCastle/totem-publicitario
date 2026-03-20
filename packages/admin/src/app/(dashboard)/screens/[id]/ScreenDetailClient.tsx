@@ -560,8 +560,8 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
         </p>
       )}
 
-      {/* ── Totem: activity catalog + schedule (Magna only) ── */}
-      {screen?.screenType === 'totem' && screen?.organization?.slug !== 'pedraza' && (
+      {/* ── Totem: activity catalog + schedule ── */}
+      {screen?.screenType === 'totem' && (
         <>
           {/* ── Activity catalog ────────────────────────────────────────────── */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
