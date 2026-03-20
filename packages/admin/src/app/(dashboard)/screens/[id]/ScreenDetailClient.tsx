@@ -10,6 +10,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
+import { useOrgStore } from '@/stores/org.store';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -43,6 +44,8 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const { id } = params;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { selectedOrg } = useOrgStore();
+  const isMagna = selectedOrg?.slug === 'magna';
 
   // ── Media/content state ───────────────────────────────────────────────────
   const [items, setItems] = useState<any[]>([]);
@@ -433,6 +436,8 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   }
 
   const isOnline = screen?.status === 'online';
+  const isTotem = screen?.screenType === 'totem';
+  const isMagnaTotem = isMagna && isTotem;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -452,14 +457,16 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
         >
           <Pencil className="w-4 h-4" />
         </button>
-        <button
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition text-sm"
-        >
-          <Save className="w-4 h-4" />
-          {saveMutation.isPending ? 'Guardando...' : 'Guardar'}
-        </button>
+        {!isMagnaTotem && (
+          <button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition text-sm"
+          >
+            <Save className="w-4 h-4" />
+            {saveMutation.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        )}
       </div>
 
       {/* Screen info */}
@@ -469,7 +476,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
             {isOnline ? <Wifi className="w-6 h-6 text-green-600" /> : <WifiOff className="w-6 h-6 text-slate-400" />}
           </div>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-sm font-medium ${isOnline ? 'text-green-600' : 'text-slate-400'}`}>
                 {isOnline ? 'Online' : 'Offline'}
               </span>
@@ -478,17 +485,26 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
                   · visto {formatDistanceToNow(new Date(screen.lastSeenAt), { addSuffix: true, locale: es })}
                 </span>
               )}
+              <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                {isTotem
+                  ? <><RectangleVertical className="w-3 h-3" /> Totem</>
+                  : <><Tv className="w-3 h-3" /> TV</>}
+              </span>
+              <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <RotateCcw className="w-3 h-3" />
+                {screen?.orientation === 'portrait' ? 'Vertical' : 'Horizontal'}
+              </span>
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-2">
               {screen?.deviceCode ? (
                 <>
-                  <span className="font-mono text-sm bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                  <span className="text-xs text-slate-400">Código de emparejamiento:</span>
+                  <span className="font-mono text-sm font-bold bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded tracking-widest">
                     {screen.deviceCode}
                   </span>
                   <button onClick={copyCode} className="text-slate-400 hover:text-blue-500 transition" title="Copiar código">
                     {codeCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                   </button>
-                  <span className="text-xs text-slate-400">· código del player</span>
                 </>
               ) : (
                 <button
@@ -500,16 +516,12 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400">
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>{screen?.orientation === 'portrait' ? 'Vertical' : 'Horizontal'}</span>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Content list */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+      {/* Content list — hidden for Magna totems (schedule-only mode) */}
+      {!isMagnaTotem && <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
           <h2 className="font-semibold text-slate-900 dark:text-white">
             Contenido de esta pantalla ({items.length})
@@ -569,12 +581,12 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
             ))}
           </ul>
         )}
-      </div>
+      </div>}
 
-      {saveMutation.isSuccess && (
+      {!isMagnaTotem && saveMutation.isSuccess && (
         <p className="text-green-600 text-sm text-center">✓ Guardado — la pantalla se actualiza en segundos</p>
       )}
-      {saveMutation.isError && (
+      {!isMagnaTotem && saveMutation.isError && (
         <p className="text-red-500 text-sm text-center">
           ✗ Error: {(saveMutation.error as any)?.response?.data?.message ?? 'intentá de nuevo'}
         </p>
