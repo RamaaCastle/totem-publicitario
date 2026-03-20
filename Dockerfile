@@ -19,7 +19,7 @@ COPY packages/backend ./packages/backend
 COPY packages/admin   ./packages/admin
 
 # Build admin static export (NEXT_PUBLIC_API_URL baked in at build time)
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://187.77.53.136
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN pnpm --filter admin build
