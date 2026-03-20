@@ -40,18 +40,19 @@ function getArgDateLabel(offsetDays = 0): string {
   }).format(d);
 }
 
-function getScreenId(fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  const idx = segments.indexOf('screens');
-  const urlId = idx !== -1 ? segments[idx + 1] : null;
-  return urlId && urlId !== '_' ? urlId : fallback;
-}
-
 export default function ScreenDetailClient({ params }: { params: { id: string } }) {
   const urlParams = useParams();
-  const id = getScreenId((urlParams?.id as string) || params.id);
   const router = useRouter();
+
+  // In Next.js static export, params.id is '_' (placeholder from generateStaticParams).
+  // We read the real UUID from the URL after mount to avoid hydration mismatches.
+  const [id, setId] = useState<string>((urlParams?.id as string) || params.id);
+  useEffect(() => {
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    const idx = segments.indexOf('screens');
+    const urlId = idx !== -1 ? segments[idx + 1] : null;
+    if (urlId && urlId !== '_') setId(urlId);
+  }, []);
   const queryClient = useQueryClient();
   const { selectedOrg } = useOrgStore();
   const isMagna = selectedOrg?.slug === 'magna';
