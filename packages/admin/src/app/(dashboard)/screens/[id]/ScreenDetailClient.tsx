@@ -376,12 +376,15 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file) return;
     setUploadingActivityImg(true);
     try {
+      const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
       const form = new FormData();
-      form.append('file', file);
-      const result = await apiClient.post('/api/v1/media/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      }).then((r) => r.data?.data);
-      if (result?.publicUrl) setActivityFormImageUrl(result.publicUrl);
+      form.append('image', file);
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: 'POST',
+        body: form,
+      });
+      const json = await res.json();
+      if (json?.data?.url) setActivityFormImageUrl(json.data.url);
     } catch { /* silent */ } finally {
       setUploadingActivityImg(false);
       if (activityImgRef.current) activityImgRef.current.value = '';
