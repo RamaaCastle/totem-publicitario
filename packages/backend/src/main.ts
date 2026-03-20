@@ -31,8 +31,9 @@ async function bootstrap() {
   app.use(compression());
 
   // CORS
+  const corsWildcard = (corsOrigins as any)[0] === '*';
   app.enableCors({
-    origin: corsOrigins,
+    origin: corsWildcard ? true : corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
