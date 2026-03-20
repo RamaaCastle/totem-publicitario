@@ -44,7 +44,7 @@ export default function OrgSelectPage() {
   }, [_hasHydrated, isAuthenticated, selectedOrg, router]);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     fetch(`${apiUrl}/api/v1/organizations/public`)
       .then((r) => r.json())
       .then((data) => {

@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import * as helmet from 'helmet';
 import * as compression from 'compression';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -81,6 +82,26 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
     logger.log(`Swagger docs available at http://${host}:${port}/api/docs`);
   }
+
+  // SPA fallback: serve index.html for any non-API, non-asset route not found by serve-static.
+  // This allows Next.js client-side router to handle dynamic routes like /screens/:id.
+  const publicDir = nodeEnv === 'production'
+    ? join(__dirname, 'public')
+    : join(__dirname, '../../admin/out');
+
+  const server = app.getHttpAdapter().getInstance();
+  server.get('*', (req: any, res: any, next: any) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/socket.io') ||
+      /\.[^/]+$/.test(req.path)   // has file extension (js, css, png, etc.)
+    ) {
+      return next();
+    }
+    res.sendFile('index.html', { root: publicDir }, (err: any) => {
+      if (err) next();
+    });
+  });
 
   await app.listen(port, host);
   logger.log(`🚀 Backend running on http://${host}:${port}/api/v1`);
