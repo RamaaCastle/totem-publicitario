@@ -302,6 +302,14 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     },
   });
 
+  // ── Regenerate device code ─────────────────────────────────────────────────
+  const regenerateCodeMutation = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/screens/${id}/regenerate-code`).then((r) => r.data?.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['screen', id] });
+    },
+  });
+
   // ── Activity catalog mutations + helpers ──────────────────────────────────
   const saveActivitiesMutation = useMutation({
     mutationFn: () => apiClient.put(`/api/v1/screens/${id}/activities`, { activities }),
@@ -472,13 +480,25 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <span className="font-mono text-sm bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
-                {screen?.deviceCode}
-              </span>
-              <button onClick={copyCode} className="text-slate-400 hover:text-blue-500 transition" title="Copiar código">
-                {codeCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-              </button>
-              <span className="text-xs text-slate-400">· código del player</span>
+              {screen?.deviceCode ? (
+                <>
+                  <span className="font-mono text-sm bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                    {screen.deviceCode}
+                  </span>
+                  <button onClick={copyCode} className="text-slate-400 hover:text-blue-500 transition" title="Copiar código">
+                    {codeCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                  <span className="text-xs text-slate-400">· código del player</span>
+                </>
+              ) : (
+                <button
+                  onClick={() => regenerateCodeMutation.mutate()}
+                  disabled={regenerateCodeMutation.isPending}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline disabled:opacity-50"
+                >
+                  {regenerateCodeMutation.isPending ? 'Generando...' : 'Generar código de emparejamiento'}
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400">
               <RotateCcw className="w-3.5 h-3.5" />
@@ -833,7 +853,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
                     <button
                       key={type}
                       type="button"
-                      onClick={() => { setEditScreenType(type); if (type === 'tv') setEditOrientation('landscape'); }}
+                      onClick={() => { setEditScreenType(type); if (type === 'tv') setEditOrientation('landscape'); else setEditOrientation('portrait'); }}
                       className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition ${
                         editScreenType === type
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'

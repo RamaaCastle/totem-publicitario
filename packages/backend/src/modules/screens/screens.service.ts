@@ -155,6 +155,13 @@ export class ScreensService {
     };
   }
 
+  async regenerateDeviceCode(id: string, organizationId: string): Promise<Screen> {
+    const screen = await this.findOne(id, organizationId);
+    const deviceCode = await this.generateUniqueDeviceCode();
+    screen.deviceCode = deviceCode;
+    return this.screenRepo.save(screen);
+  }
+
   private async generateUniqueDeviceCode(): Promise<string> {
     let code: string;
     let exists: boolean;

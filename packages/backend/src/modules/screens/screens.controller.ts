@@ -80,6 +80,16 @@ export class ScreensController {
     return screen;
   }
 
+  @Post(':id/regenerate-code')
+  @RequirePermissions('screens:update')
+  @ApiOperation({ summary: 'Regenerate device pairing code' })
+  regenerateCode(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.screensService.regenerateDeviceCode(id, user.organizationId);
+  }
+
   @Put(':id/activities')
   @RequirePermissions('screens:update')
   @ApiOperation({ summary: 'Update activity catalog for totem screen' })

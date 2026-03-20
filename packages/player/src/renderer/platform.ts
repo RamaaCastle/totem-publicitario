@@ -14,8 +14,8 @@ export interface DeviceConfig {
 }
 
 const defaultConfig: DeviceConfig = {
-  apiUrl: 'http://localhost:3001',
-  wsUrl: 'ws://localhost:3001',
+  apiUrl: 'http://187.77.53.136',
+  wsUrl: 'ws://187.77.53.136',
 };
 
 export const platform = {
