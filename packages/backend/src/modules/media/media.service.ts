@@ -6,9 +6,11 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { createReadStream, unlink } from 'fs';
+import { readFile } from 'fs/promises';
 import { promisify } from 'util';
 
 import { MediaFile, MediaType, MediaStatus } from '../../database/entities/media-file.entity';
+import { Organization } from '../../database/entities/organization.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 const unlinkAsync = promisify(unlink);
@@ -19,6 +21,7 @@ export class MediaService {
 
   constructor(
     @InjectRepository(MediaFile) private readonly mediaRepo: Repository<MediaFile>,
+    @InjectRepository(Organization) private readonly orgRepo: Repository<Organization>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -53,15 +56,14 @@ export class MediaService {
     organizationId: string,
     uploadedById: string,
   ): Promise<MediaFile> {
-    const apiUrl = this.configService.get<string>('app.apiUrl', 'http://localhost:3001');
-    const uploadDir = this.configService.get<string>('app.uploadDir', './uploads');
-
     const type = this.detectMediaType(multerFile.mimetype);
     const checksum = await this.calculateChecksum(multerFile.path);
-    const normalizedPath = multerFile.path.replace(/\\/g, '/');
-    const uploadsIdx = normalizedPath.indexOf('uploads/');
-    const relativePath = uploadsIdx >= 0 ? normalizedPath.slice(uploadsIdx + 'uploads'.length) : `/${normalizedPath}`;
-    const publicUrl = `${apiUrl}/api/v1/media/files${relativePath}`;
+
+    // Always upload to Cloudinary
+    const cloudName = this.configService.get<string>('app.cloudinaryCloudName', 'dnyuwzead');
+    const uploadPreset = this.configService.get<string>('app.cloudinaryUploadPreset', 'Pedraza');
+    const publicUrl = await this.uploadToCloudinary(multerFile, cloudName, uploadPreset);
+    this.logger.log(`Uploaded media to Cloudinary: ${publicUrl}`);
 
     const mediaFile = this.mediaRepo.create({
       originalName: multerFile.originalname,
@@ -77,6 +79,31 @@ export class MediaService {
     });
 
     return this.mediaRepo.save(mediaFile);
+  }
+
+  private async uploadToCloudinary(
+    multerFile: Express.Multer.File,
+    cloudName: string,
+    uploadPreset: string,
+  ): Promise<string> {
+    const fileBuffer = await readFile(multerFile.path);
+    const base64File = fileBuffer.toString('base64');
+    const dataUri = `data:${multerFile.mimetype};base64,${base64File}`;
+
+    const formData = new FormData();
+    formData.append('file', dataUri);
+    formData.append('upload_preset', uploadPreset);
+
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
+    const response = await fetch(url, { method: 'POST', body: formData });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new BadRequestException(`Cloudinary upload failed: ${text}`);
+    }
+
+    const data: any = await response.json();
+    return data.secure_url as string;
   }
 
   async remove(id: string, organizationId: string): Promise<void> {
