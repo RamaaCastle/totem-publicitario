@@ -83,24 +83,26 @@ async function bootstrap() {
     logger.log(`Swagger docs available at http://${host}:${port}/api/docs`);
   }
 
-  // SPA fallback: serve index.html for any non-API, non-asset route not found by serve-static.
-  // This allows Next.js client-side router to handle dynamic routes like /screens/:id.
+  // Dynamic route fallback: Next.js static export only pre-builds /screens/_ and /playlists/_.
+  // For real IDs, serve the pre-built shell and let the client-side router handle params.
   const publicDir = nodeEnv === 'production'
     ? join(__dirname, 'public')
     : join(__dirname, '../../admin/out');
 
+  const dynamicRoutes: Array<{ pattern: RegExp; fallback: string }> = [
+    { pattern: /^\/screens\/[^/]+\/?$/, fallback: 'screens/_/index.html' },
+    { pattern: /^\/playlists\/[^/]+\/?$/, fallback: 'playlists/_/index.html' },
+  ];
+
   const server = app.getHttpAdapter().getInstance();
   server.get('*', (req: any, res: any, next: any) => {
-    if (
-      req.path.startsWith('/api') ||
-      req.path.startsWith('/socket.io') ||
-      /\.[^/]+$/.test(req.path)   // has file extension (js, css, png, etc.)
-    ) {
-      return next();
+    const match = dynamicRoutes.find((r) => r.pattern.test(req.path));
+    if (match) {
+      return res.sendFile(match.fallback, { root: publicDir }, (err: any) => {
+        if (err) next();
+      });
     }
-    res.sendFile('index.html', { root: publicDir }, (err: any) => {
-      if (err) next();
-    });
+    next();
   });
 
   await app.listen(port, host);
