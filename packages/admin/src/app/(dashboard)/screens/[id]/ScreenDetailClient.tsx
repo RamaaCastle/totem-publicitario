@@ -376,15 +376,17 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file) return;
     setUploadingActivityImg(true);
     try {
-      const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
       const form = new FormData();
-      form.append('image', file);
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      form.append('file', file);
+      form.append('upload_preset', uploadPreset!);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',
         body: form,
       });
       const json = await res.json();
-      if (json?.data?.url) setActivityFormImageUrl(json.data.url);
+      if (json?.secure_url) setActivityFormImageUrl(json.secure_url);
     } catch { /* silent */ } finally {
       setUploadingActivityImg(false);
       if (activityImgRef.current) activityImgRef.current.value = '';
