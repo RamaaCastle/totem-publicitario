@@ -6,9 +6,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, Trash2, Save, Film, Image as ImageIcon, Clock } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 
+function getPlaylistId(fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const idx = segments.indexOf('playlists');
+  const urlId = idx !== -1 ? segments[idx + 1] : null;
+  return urlId && urlId !== '_' ? urlId : fallback;
+}
+
 export default function PlaylistEditClient({ params }: { params: { id: string } }) {
   const urlParams = useParams();
-  const id = (urlParams?.id as string) || params.id;
+  const id = getPlaylistId((urlParams?.id as string) || params.id);
   const router = useRouter();
   const queryClient = useQueryClient();
 

@@ -40,11 +40,17 @@ function getArgDateLabel(offsetDays = 0): string {
   }).format(d);
 }
 
+function getScreenId(fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const idx = segments.indexOf('screens');
+  const urlId = idx !== -1 ? segments[idx + 1] : null;
+  return urlId && urlId !== '_' ? urlId : fallback;
+}
+
 export default function ScreenDetailClient({ params }: { params: { id: string } }) {
   const urlParams = useParams();
-  // useParams() reads the real URL in the browser (works for both hard refresh and client nav)
-  // Falls back to props for SSR/build time
-  const id = (urlParams?.id as string) || params.id;
+  const id = getScreenId((urlParams?.id as string) || params.id);
   const router = useRouter();
   const queryClient = useQueryClient();
   const { selectedOrg } = useOrgStore();
