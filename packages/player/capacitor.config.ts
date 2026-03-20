@@ -1,0 +1,16 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.signage.player',
+  appName: 'Signage Player',
+  webDir: 'dist/renderer',
+  server: {
+    androidScheme: 'https',
+  },
+  android: {
+    allowMixedContent: true,
+    backgroundColor: '#000000',
+  },
+};
+
+export default config;

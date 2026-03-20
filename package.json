@@ -1,0 +1,42 @@
+{
+  "name": "signage-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Professional Digital Signage Platform - SaaS Ready",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "pnpm build:admin && pnpm --filter backend dev",
+    "dev": "concurrently \"pnpm --filter backend dev\" \"pnpm --filter admin dev\"",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:admin": "pnpm --filter admin dev",
+    "dev:player": "pnpm --filter player dev",
+    "build": "pnpm --filter backend build && pnpm --filter admin build",
+    "build:backend": "pnpm --filter backend build",
+    "build:admin": "pnpm --filter admin build",
+    "build:player": "pnpm --filter player build",
+    "build:prod": "node scripts/build-prod.js",
+    "deploy": "bash scripts/deploy-server.sh",
+    "start:prod": "cd dist && pm2 start ecosystem.config.js --env production",
+    "stop:prod": "cd dist && pm2 stop ecosystem.config.js",
+    "restart:prod": "cd dist && pm2 restart ecosystem.config.js --env production",
+    "logs:prod": "pm2 logs",
+    "seed": "pnpm --filter backend seed",
+    "test": "pnpm --filter backend test && pnpm --filter admin test",
+    "lint": "pnpm --recursive lint",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@nestjs/core", "esbuild", "electron", "sharp", "unrs-resolver"]
+  }
+}

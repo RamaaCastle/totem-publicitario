@@ -1,0 +1,579 @@
+import React, { useEffect, useState } from 'react';
+
+type ScheduleItem = { time: string; activity: string; location?: string; imageUrl?: string };
+type ViewMode = 'all' | 'current' | 'individual';
+interface Props { schedule: ScheduleItem[]; screenName: string }
+
+const DUR_ALL        = 12_000;
+const DUR_CURRENT    =  8_000;
+const DUR_INDIVIDUAL =  6_000;
+
+// ─── Argentina time ───────────────────────────────────────────────────────────
+function getArgTime(): string {
+  const p = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const h = p.find(x => x.type === 'hour')?.value   ?? '00';
+  const m = p.find(x => x.type === 'minute')?.value ?? '00';
+  return `${h === '24' ? '00' : h}:${m}`;
+}
+function getArgDateStr(): string {
+  const p = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    weekday: 'long', day: 'numeric', month: 'long',
+  }).formatToParts(new Date());
+  const wd = p.find(x => x.type === 'weekday')?.value ?? '';
+  const d  = p.find(x => x.type === 'day')?.value    ?? '';
+  const mo = p.find(x => x.type === 'month')?.value  ?? '';
+  return `${wd.charAt(0).toUpperCase() + wd.slice(1)}, ${d} de ${mo}`;
+}
+function toMins(t: string): number {
+  const [h = 0, m = 0] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Keyword → gradient fallback (when no custom image uploaded)
+function getActivityGradient(activity: string): string {
+  const a = activity.toLowerCase();
+  if (/pool|pileta|nadar|natac|swim|acuatic/.test(a))
+    return 'linear-gradient(160deg, #0c4a6e 0%, #0369a1 50%, #0284c7 100%)';
+  if (/gym|gimnas|fitness|ejerc|crossfit|pesas|musculac/.test(a))
+    return 'linear-gradient(160deg, #1c1917 0%, #292524 50%, #57534e 100%)';
+  if (/yoga|meditac|pilates|stretching|mindful|zen/.test(a))
+    return 'linear-gradient(160deg, #2e1065 0%, #4c1d95 50%, #7c3aed 100%)';
+  if (/spa|masaje|relax|sauna|wellness|jacuzzi/.test(a))
+    return 'linear-gradient(160deg, #134e4a 0%, #0f766e 50%, #0d9488 100%)';
+  if (/desayuno|breakfast|brunch/.test(a))
+    return 'linear-gradient(160deg, #78350f 0%, #b45309 50%, #d97706 100%)';
+  if (/almuerzo|lunch|comida|cena|dinner|restaur|gastronom|buffet|grill/.test(a))
+    return 'linear-gradient(160deg, #7c2d12 0%, #c2410c 50%, #ea580c 100%)';
+  if (/trek|caminat|hiking|sendero|monta|excurs|senderismo/.test(a))
+    return 'linear-gradient(160deg, #14532d 0%, #15803d 50%, #22c55e 100%)';
+  if (/bar|cocktail|drink|bebida|happy|aperitivo|wine|vino|cerveza/.test(a))
+    return 'linear-gradient(160deg, #1e1b4b 0%, #3730a3 50%, #6366f1 100%)';
+  if (/kids|niño|infantil|junior|mini|children|chico/.test(a))
+    return 'linear-gradient(160deg, #831843 0%, #be185d 50%, #ec4899 100%)';
+  if (/bike|bici|ciclis|cycling|mountain/.test(a))
+    return 'linear-gradient(160deg, #052e16 0%, #166534 50%, #16a34a 100%)';
+  if (/tenis|tennis|padel|squash|deporte|cancha/.test(a))
+    return 'linear-gradient(160deg, #1a2e05 0%, #365314 50%, #84cc16 100%)';
+  if (/surf|playa|beach|mar|ocean|buceo|snorkel/.test(a))
+    return 'linear-gradient(160deg, #083344 0%, #155e75 50%, #0891b2 100%)';
+  if (/musica|show|espectaculo|live|concierto|banda|teatro|danza/.test(a))
+    return 'linear-gradient(160deg, #2d1b69 0%, #5b21b6 50%, #a855f7 100%)';
+  if (/tour|paseo|visita|city|excursion/.test(a))
+    return 'linear-gradient(160deg, #1c1917 0%, #374151 50%, #6b7280 100%)';
+  return 'linear-gradient(160deg, #b91c1c 0%, #dc2626 50%, #991b1b 100%)';
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+export function TotemCalendarScreen({ schedule }: Props) {
+  const [time,    setTime]    = useState<string>(getArgTime);
+  const [dateStr, setDateStr] = useState<string>(getArgDateStr);
+  const [mode,    setMode]    = useState<ViewMode>('all');
+  const [itemIdx, setItemIdx] = useState(0);
+  const [fadeKey, setFadeKey] = useState(0);
+
+  // Sorted all activities
+  const sorted = [...schedule].sort((a, b) => a.time.localeCompare(b.time));
+
+  // Current time in minutes
+  const nowMins = toMins(time);
+
+  // Current activity: last one whose time <= now
+  const currentItem = [...sorted].reverse().find(s => toMins(s.time) <= nowMins) ?? null;
+
+  // Next activity: first one whose time > now
+  const nextItem = sorted.find(s => toMins(s.time) > nowMins) ?? null;
+
+  // Upcoming activities: all activities after the current time (for individual cycling)
+  const upcomingItems = sorted.filter(s => toMins(s.time) > nowMins);
+
+  const minsToNext = nextItem ? toMins(nextItem.time) - nowMins : null;
+  const comingSoon = minsToNext !== null && minsToNext <= 30;
+
+  // Clock
+  useEffect(() => {
+    const iv = setInterval(() => { setTime(getArgTime()); setDateStr(getArgDateStr()); }, 1_000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Cycle: all → current → individual (upcoming only) → all
+  useEffect(() => {
+    if (sorted.length === 0) return;
+    const bump = () => setFadeKey(k => k + 1);
+    let t: ReturnType<typeof setTimeout>;
+
+    if (mode === 'all') {
+      t = setTimeout(() => {
+        bump();
+        setMode('current');
+      }, DUR_ALL);
+
+    } else if (mode === 'current') {
+      t = setTimeout(() => {
+        bump();
+        if (upcomingItems.length > 0) {
+          setItemIdx(0);
+          setMode('individual');
+        } else {
+          setMode('all');
+        }
+      }, DUR_CURRENT);
+
+    } else if (mode === 'individual') {
+      t = setTimeout(() => {
+        bump();
+        if (itemIdx < upcomingItems.length - 1) {
+          setItemIdx(i => i + 1);
+        } else {
+          setItemIdx(0);
+          setMode('all');
+        }
+      }, DUR_INDIVIDUAL);
+    }
+
+    return () => clearTimeout(t);
+  }, [mode, itemIdx, sorted.length, upcomingItems.length]); // eslint-disable-line
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden', position: 'relative',
+      color: '#fff',
+      background: 'linear-gradient(160deg, #b91c1c 0%, #dc2626 35%, #b91c1c 65%, #991b1b 100%)',
+      backgroundSize: '200% 200%',
+      animation: 'bgFloat 12s ease-in-out infinite',
+    }}>
+      {/* Diagonal stripe texture */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+        backgroundImage: `repeating-linear-gradient(-45deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 28px)`,
+      }} />
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '300px',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 100%)',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+
+      {/* ── Header ── */}
+      <div style={{
+        flexShrink: 0, position: 'relative', zIndex: 2,
+        padding: '24px 32px 18px',
+        borderBottom: '2px solid rgba(255,255,255,0.22)',
+        background: 'rgba(0,0,0,0.20)',
+      }}>
+        <div style={{ fontSize: '17px', letterSpacing: '0.38em', color: 'rgba(255,255,255,0.70)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '10px' }}>
+          Magna Hoteles
+        </div>
+        <div style={{ fontSize: '62px', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, color: '#fff', textShadow: '0 2px 24px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
+          Actividades del día
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
+          <div style={{ fontSize: '25px', color: 'rgba(255,255,255,0.72)', fontWeight: 600 }}>{dateStr}</div>
+          <div style={{
+            background: 'rgba(255,255,255,0.16)', border: '2px solid rgba(255,255,255,0.32)',
+            borderRadius: '14px', padding: '8px 18px',
+            display: 'flex', alignItems: 'baseline', gap: '5px',
+          }}>
+            <div style={{ fontSize: '52px', fontWeight: 900, lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', color: '#fff', textShadow: '0 0 30px rgba(255,255,255,0.4)', animation: 'clockPulse 1s ease-in-out infinite' }}>
+              {time}
+            </div>
+            <div style={{ fontSize: '16px', color: 'rgba(255,255,255,0.50)', marginBottom: '3px' }}>hs</div>
+          </div>
+        </div>
+
+        {/* Phase bar */}
+        <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
+          {(['all', 'current', 'individual'] as ViewMode[]).map(m => (
+            <div key={m} style={{
+              flex: mode === m ? 2.5 : 1, height: '4px', borderRadius: '2px',
+              background: mode === m ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.10)',
+              transition: 'flex 0.5s ease', position: 'relative', overflow: 'hidden',
+            }}>
+              {mode === m && (
+                <div style={{
+                  position: 'absolute', inset: 0, background: '#fff',
+                  animation: `progressBar ${m === 'all' ? DUR_ALL : m === 'current' ? DUR_CURRENT : DUR_INDIVIDUAL}ms linear`,
+                }} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      <div key={fadeKey} style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1, animation: 'viewFadeIn 0.6s ease-out' }}>
+        {mode === 'all' && (
+          <AllView
+            sorted={sorted}
+            nowMins={nowMins}
+            currentItem={currentItem}
+            nextItem={nextItem}
+          />
+        )}
+        {mode === 'current' && (
+          <CurrentView
+            currentItem={currentItem}
+            nextItem={nextItem}
+            minsToNext={minsToNext}
+            comingSoon={comingSoon}
+          />
+        )}
+        {mode === 'individual' && upcomingItems[itemIdx] && (
+          <IndividualView
+            item={upcomingItems[itemIdx]}
+            index={itemIdx}
+            total={upcomingItems.length}
+            minsToNext={
+              itemIdx === 0 && minsToNext !== null && minsToNext <= 60 ? minsToNext : null
+            }
+            isCurrent={currentItem?.time === upcomingItems[itemIdx].time}
+          />
+        )}
+      </div>
+
+      <div style={{ flexShrink: 0, height: '5px', zIndex: 3, background: 'linear-gradient(90deg, rgba(255,255,255,0.15), rgba(255,255,255,0.65), rgba(255,255,255,0.15))' }} />
+
+      <style>{`
+        @keyframes bgFloat { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+        @keyframes viewFadeIn { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes slideLeft { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes scaleIn { from{opacity:0;transform:scale(0.93)} to{opacity:1;transform:scale(1)} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
+        @keyframes blinkSoft { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes progressBar { from{width:0%} to{width:100%} }
+        @keyframes clockPulse { 0%,100%{text-shadow:0 0 30px rgba(255,255,255,0.4)} 50%{text-shadow:0 0 55px rgba(255,255,255,0.85)} }
+        @keyframes shimmerBar { 0%{left:-100%} 100%{left:200%} }
+        @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes whitePulse { 0%,100%{box-shadow:0 0 0 rgba(255,255,255,0)} 50%{box-shadow:0 0 50px rgba(255,255,255,0.45),0 0 100px rgba(255,255,255,0.18)} }
+        @keyframes imgZoom { from{transform:scale(1)} to{transform:scale(1.06)} }
+        @keyframes countdownShrink { from{width:100%} to{width:0%} }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── ALL VIEW ─────────────────────────────────────────────────────────────────
+function AllView({ sorted, nowMins, currentItem, nextItem }: {
+  sorted: ScheduleItem[]; nowMins: number;
+  currentItem: ScheduleItem | null; nextItem: ScheduleItem | null;
+}) {
+  return (
+    <div style={{
+      height: '100%', overflowY: 'hidden', padding: '14px 22px',
+      display: 'flex', flexDirection: 'column', gap: '10px',
+    }}>
+      {sorted.map((item, i) => {
+        const isCurrent = currentItem?.time === item.time;
+        const isNext    = nextItem?.time === item.time;
+        const isPast    = toMins(item.time) < nowMins && !isCurrent;
+        const imgUrl    = item.imageUrl || null;
+        const gradient  = getActivityGradient(item.activity);
+
+        return (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'stretch',
+            borderRadius: '18px', overflow: 'hidden',
+            opacity: isPast ? 0.25 : 1,
+            animation: `slideLeft 0.45s ease-out ${i * 0.05}s both`,
+            background: isCurrent ? '#fff' : isNext ? 'rgba(255,255,255,0.17)' : 'rgba(255,255,255,0.09)',
+            border: isCurrent ? '3px solid #fff' : isNext ? '2px solid rgba(255,255,255,0.38)' : '1px solid rgba(255,255,255,0.13)',
+            boxShadow: isCurrent ? '0 0 40px rgba(255,255,255,0.45), 0 6px 28px rgba(0,0,0,0.2)' : 'none',
+            minHeight: '88px',
+          }}>
+
+            {/* Activity image / gradient thumbnail */}
+            <div style={{ width: '90px', flexShrink: 0, position: 'relative', overflow: 'hidden', background: gradient }}>
+              {imgUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imgUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              )}
+              <div style={{ position: 'absolute', inset: 0, background: isCurrent ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.28)' }} />
+            </div>
+
+            {/* Time block */}
+            <div style={{
+              width: '130px', flexShrink: 0,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '14px 10px',
+              background: isCurrent ? 'rgba(220,38,38,0.08)' : 'rgba(0,0,0,0.10)',
+              borderRight: isCurrent ? '2px solid rgba(220,38,38,0.18)' : '1px solid rgba(255,255,255,0.10)',
+            }}>
+              <div style={{ fontSize: '38px', fontWeight: 900, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: isCurrent ? '#dc2626' : '#fff' }}>
+                {item.time}
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: isCurrent ? 'rgba(220,38,38,0.55)' : 'rgba(255,255,255,0.40)', marginTop: '3px' }}>hs</div>
+            </div>
+
+            {/* Activity text */}
+            <div style={{ flex: 1, padding: '14px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: '30px', fontWeight: isCurrent || isNext ? 800 : 600, lineHeight: 1.2, color: isCurrent ? '#111' : '#fff' }}>
+                {item.activity}
+              </div>
+              {item.location && (
+                <div style={{ fontSize: '17px', marginTop: '4px', color: isCurrent ? 'rgba(0,0,0,0.48)' : 'rgba(255,255,255,0.52)' }}>
+                  📍 {item.location}
+                </div>
+              )}
+            </div>
+
+            {/* Badge */}
+            <div style={{ width: '90px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px' }}>
+              {isCurrent && (
+                <div style={{ background: '#dc2626', color: '#fff', fontSize: '13px', fontWeight: 900, letterSpacing: '0.08em', padding: '7px 10px', borderRadius: '9px', animation: 'blinkSoft 1.8s ease-in-out infinite', textAlign: 'center' }}>
+                  AHORA
+                </div>
+              )}
+              {isNext && !isCurrent && (
+                <div style={{ background: 'rgba(255,255,255,0.20)', color: '#fff', fontSize: '12px', fontWeight: 800, letterSpacing: '0.06em', padding: '6px 8px', borderRadius: '9px', border: '1px solid rgba(255,255,255,0.38)', textAlign: 'center' }}>
+                  PRÓX.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {sorted.length === 0 && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', color: 'rgba(255,255,255,0.38)' }}>
+          Sin actividades programadas para hoy
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CURRENT VIEW ─────────────────────────────────────────────────────────────
+// Shows: current activity (EN CURSO) + next activity (PRÓXIMO)
+function CurrentView({ currentItem, nextItem, minsToNext, comingSoon }: {
+  currentItem: ScheduleItem | null; nextItem: ScheduleItem | null;
+  minsToNext: number | null; comingSoon: boolean;
+}) {
+  if (!currentItem && !nextItem) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+        <div style={{ fontSize: '72px' }}>🌙</div>
+        <div style={{ fontSize: '26px', color: 'rgba(255,255,255,0.52)', fontWeight: 600 }}>Fin de actividades del día</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '18px 26px', gap: '16px' }}>
+
+      {/* ── EN CURSO ── */}
+      {currentItem && (
+        <div style={{
+          flex: nextItem ? '1.6' : '1',
+          borderRadius: '22px', overflow: 'hidden',
+          border: '3px solid #fff',
+          boxShadow: '0 0 60px rgba(255,255,255,0.38), 0 14px 44px rgba(0,0,0,0.22)',
+          display: 'flex', flexDirection: 'column',
+          position: 'relative',
+          animation: 'scaleIn 0.5s ease-out, whitePulse 3s ease-in-out infinite',
+        }}>
+          {/* Background */}
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <div style={{ position: 'absolute', inset: 0, background: getActivityGradient(currentItem.activity) }} />
+            {currentItem.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={currentItem.imageUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            )}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.62) 100%)' }} />
+          </div>
+
+          <div style={{ position: 'relative', zIndex: 1, padding: '26px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 14px rgba(255,255,255,0.8)', animation: 'blink 1.4s ease-in-out infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: '14px', fontWeight: 900, letterSpacing: '0.22em', color: '#fff' }}>EN CURSO AHORA</span>
+            </div>
+            <div style={{ fontSize: '66px', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: '#fff', textShadow: '0 0 40px rgba(255,255,255,0.28)' }}>
+              {currentItem.time}
+              <span style={{ fontSize: '20px', fontWeight: 400, color: 'rgba(255,255,255,0.48)', marginLeft: '8px' }}>hs</span>
+            </div>
+            <div style={{ fontSize: '32px', fontWeight: 800, color: '#fff', marginTop: '10px', lineHeight: 1.2, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+              {currentItem.activity}
+            </div>
+            {currentItem.location && (
+              <div style={{ fontSize: '18px', color: 'rgba(255,255,255,0.68)', marginTop: '6px' }}>📍 {currentItem.location}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── PRÓXIMO ── */}
+      {nextItem && (
+        <div style={{
+          flex: currentItem ? '1' : '1.6',
+          borderRadius: '22px', overflow: 'hidden',
+          border: `2px solid ${comingSoon ? 'rgba(255,255,255,0.58)' : 'rgba(255,255,255,0.22)'}`,
+          display: 'flex', flexDirection: 'column',
+          position: 'relative',
+          animation: 'scaleIn 0.5s ease-out 0.12s both',
+        }}>
+          {/* Background */}
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <div style={{ position: 'absolute', inset: 0, background: getActivityGradient(nextItem.activity), opacity: 0.7 }} />
+            {nextItem.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={nextItem.imageUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            )}
+            <div style={{ position: 'absolute', inset: 0, background: comingSoon ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.52)' }} />
+          </div>
+
+          <div style={{ position: 'relative', zIndex: 1, padding: '20px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#fff', animation: comingSoon ? 'blinkSoft 1.8s ease-in-out infinite' : 'none', flexShrink: 0 }} />
+              <span style={{ fontSize: '12px', fontWeight: 900, letterSpacing: '0.2em', color: comingSoon ? '#fff' : 'rgba(255,255,255,0.55)' }}>
+                {comingSoon ? `PRÓXIMO · EN ${minsToNext} MIN` : 'A CONTINUACIÓN'}
+              </span>
+            </div>
+            <div style={{ fontSize: '48px', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: comingSoon ? '#fff' : 'rgba(255,255,255,0.72)' }}>
+              {nextItem.time}
+              <span style={{ fontSize: '16px', fontWeight: 400, color: 'rgba(255,255,255,0.38)', marginLeft: '8px' }}>hs</span>
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 700, marginTop: '7px', lineHeight: 1.2, color: comingSoon ? '#fff' : 'rgba(255,255,255,0.62)' }}>
+              {nextItem.activity}
+            </div>
+            {nextItem.location && (
+              <div style={{ fontSize: '16px', color: 'rgba(255,255,255,0.50)', marginTop: '4px' }}>📍 {nextItem.location}</div>
+            )}
+
+            {/* Countdown bar when coming soon */}
+            {comingSoon && minsToNext !== null && (
+              <div style={{ marginTop: '14px' }}>
+                <div style={{ height: '4px', background: 'rgba(255,255,255,0.2)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', background: '#fff', borderRadius: '2px',
+                    width: `${Math.max(0, 100 - (minsToNext / 30) * 100)}%`,
+                    transition: 'width 60s linear',
+                  }} />
+                </div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.42)', marginTop: '5px', textAlign: 'right' }}>
+                  {minsToNext} min restantes
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── INDIVIDUAL VIEW ──────────────────────────────────────────────────────────
+// Shows each upcoming activity full-screen with image + dark overlay
+function IndividualView({ item, index, total, minsToNext, isCurrent }: {
+  item: ScheduleItem; index: number; total: number;
+  minsToNext: number | null; isCurrent: boolean;
+}) {
+  const imgUrl   = item.imageUrl || null;
+  const gradient = getActivityGradient(item.activity);
+  const isNext   = index === 0 && !isCurrent;
+  const soon     = isNext && minsToNext !== null && minsToNext <= 30;
+
+  let label = 'A CONTINUACIÓN';
+  if (isCurrent)    label = 'EN CURSO AHORA';
+  else if (soon)    label = `PRÓXIMO A COMENZAR · EN ${minsToNext} MIN`;
+  else if (isNext)  label = 'PRÓXIMO';
+
+  return (
+    <div style={{ height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 36px 70px' }}>
+
+      {/* Full-screen background: gradient + image + dark overlay */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+        <div style={{ position: 'absolute', inset: 0, background: gradient }} />
+        {imgUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imgUrl}
+            alt=""
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `imgZoom ${DUR_INDIVIDUAL}ms ease-in-out both` }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        )}
+        {/* Dark overlay for readability */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.52) 0%, rgba(0,0,0,0.42) 30%, rgba(0,0,0,0.75) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `repeating-linear-gradient(-45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 24px)` }} />
+      </div>
+
+      {/* Ghost time watermark behind content */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '240px', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,0.04)', lineHeight: 1, pointerEvents: 'none', userSelect: 'none', letterSpacing: '-0.06em', whiteSpace: 'nowrap', zIndex: 1 }}>
+        {item.time}
+      </div>
+
+      {/* Status badge */}
+      <div style={{ marginBottom: '28px', animation: 'scaleIn 0.4s ease-out', zIndex: 2 }}>
+        <span style={{
+          fontSize: '17px', fontWeight: 900, letterSpacing: '0.16em',
+          color: isCurrent ? '#dc2626' : '#fff',
+          background: isCurrent ? '#fff' : 'rgba(255,255,255,0.22)',
+          padding: '11px 28px', borderRadius: '40px',
+          border: isCurrent ? '3px solid #fff' : '2px solid rgba(255,255,255,0.48)',
+          animation: isCurrent || soon ? 'blinkSoft 2s ease-in-out infinite' : 'none',
+          backdropFilter: 'blur(10px)',
+        }}>
+          {label}
+        </span>
+      </div>
+
+      {/* Time */}
+      <div style={{
+        fontSize: '130px', fontWeight: 900, lineHeight: 1, letterSpacing: '-0.05em',
+        fontVariantNumeric: 'tabular-nums',
+        color: '#fff',
+        textShadow: isCurrent ? '0 0 80px rgba(255,255,255,0.55), 0 4px 30px rgba(0,0,0,0.8)' : '0 4px 30px rgba(0,0,0,0.8)',
+        animation: isCurrent ? 'floatY 3s ease-in-out infinite' : 'slideUp 0.5s ease-out 0.06s both',
+        zIndex: 2, position: 'relative',
+      }}>
+        {item.time}
+        <span style={{ fontSize: '36px', fontWeight: 400, color: 'rgba(255,255,255,0.48)', marginLeft: '10px' }}>hs</span>
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: '110px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.48)', marginTop: '14px', marginBottom: '8px', zIndex: 2, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, bottom: 0, width: '40%', background: 'rgba(220,38,38,0.85)', animation: 'shimmerBar 1.5s ease-in-out infinite' }} />
+      </div>
+
+      {/* Activity name */}
+      <div style={{ fontSize: '54px', fontWeight: 800, textAlign: 'center', marginTop: '8px', lineHeight: 1.15, letterSpacing: '-0.01em', color: '#fff', textShadow: '0 4px 30px rgba(0,0,0,0.9)', animation: 'slideUp 0.5s ease-out 0.12s both', zIndex: 2 }}>
+        {item.activity}
+      </div>
+
+      {/* Location */}
+      {item.location && (
+        <div style={{ fontSize: '30px', color: 'rgba(255,255,255,0.78)', marginTop: '16px', textAlign: 'center', animation: 'slideUp 0.5s ease-out 0.20s both', zIndex: 2, textShadow: '0 2px 14px rgba(0,0,0,0.8)' }}>
+          📍 {item.location}
+        </div>
+      )}
+
+      {/* Progress dots — showing position among upcoming activities */}
+      <div style={{ position: 'absolute', bottom: '20px', left: '32px', right: '32px', zIndex: 2 }}>
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+          {[...Array(total)].map((_, j) => (
+            <div key={j} style={{
+              flex: 1, height: '5px', borderRadius: '3px',
+              background: j < index ? 'rgba(255,255,255,0.75)' : j === index ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)',
+              position: 'relative', overflow: 'hidden',
+            }}>
+              {j === index && (
+                <div style={{ position: 'absolute', inset: 0, background: '#fff', animation: `progressBar ${DUR_INDIVIDUAL}ms linear` }} />
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{ textAlign: 'center', fontSize: '17px', color: 'rgba(255,255,255,0.40)', letterSpacing: '0.1em' }}>
+          PRÓXIMAS {index + 1} / {total}
+        </div>
+      </div>
+    </div>
+  );
+}
