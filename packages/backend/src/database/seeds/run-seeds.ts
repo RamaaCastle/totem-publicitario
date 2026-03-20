@@ -78,6 +78,12 @@ async function runSeeds() {
   console.log('✅ Seeded system roles');
 
   // 3. Create organizations
+  let defaultOrg = await orgRepo.findOne({ where: { slug: 'default' } });
+  if (!defaultOrg) {
+    defaultOrg = orgRepo.create({ name: 'Default Organization', slug: 'default', plan: PlanType.ENTERPRISE, maxScreens: 999 });
+    await orgRepo.save(defaultOrg);
+  }
+
   let magnaOrg = await orgRepo.findOne({ where: { slug: 'magna' } });
   if (!magnaOrg) {
     magnaOrg = orgRepo.create({ name: 'Magna Hoteles', slug: 'magna', plan: PlanType.ENTERPRISE, maxScreens: 999 });
@@ -93,7 +99,7 @@ async function runSeeds() {
   }
   console.log('✅ Seeded organizations');
 
-  // 4. Create super admin user (no org by default — specifies org at login via organizationSlug)
+  // 4. Create super admin user
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@signage.local';
   let adminUser = await userRepo.findOne({ where: { email: adminEmail } });
   if (!adminUser) {
@@ -107,7 +113,7 @@ async function runSeeds() {
       password: hashedPassword,
       status: UserStatus.ACTIVE,
       isSuperAdmin: true,
-      organization: null,
+      organization: defaultOrg,
       roles: [superAdminRole],
     });
     await userRepo.save(adminUser);
