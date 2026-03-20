@@ -1,7 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Empty string = relative URLs (same origin) — works when frontend is served by the backend.
+// In local dev, set NEXT_PUBLIC_API_URL=http://localhost:3001 in packages/admin/.env.local
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -53,7 +55,7 @@ apiClient.interceptors.response.use(
         const { userId, refreshToken, setAuth, logout } = useAuthStore.getState();
         if (!refreshToken || !userId) throw new Error('No refresh token');
 
-        const res = await axios.post(`${API_URL}/api/v1/auth/refresh`, { userId, refreshToken });
+        const res = await axios.post(`${API_URL || ''}/api/v1/auth/refresh`, { userId, refreshToken });
         const { accessToken: newAccess, refreshToken: newRefresh } = res.data.data;
 
         useAuthStore.setState({ accessToken: newAccess, refreshToken: newRefresh });
