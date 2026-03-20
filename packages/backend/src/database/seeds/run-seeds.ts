@@ -107,7 +107,7 @@ async function runSeeds() {
       password: hashedPassword,
       status: UserStatus.ACTIVE,
       isSuperAdmin: true,
-      organization: null,
+      organization: undefined,
       roles: [superAdminRole],
     });
     await userRepo.save(adminUser);
