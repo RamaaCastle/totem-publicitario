@@ -13,6 +13,6 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   timezone: 'Z',
   entities: [join(__dirname, '../database/entities/**/*.entity.{ts,js}')],
   migrations: [join(__dirname, '../database/migrations/**/*.{ts,js}')],
-  synchronize: process.env.NODE_ENV !== 'production',
+  synchronize: true,
   logging: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
 }));
