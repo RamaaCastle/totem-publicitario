@@ -359,7 +359,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
       ));
     } else {
       setActivities((prev) => [...prev, {
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).substring(2) + Date.now().toString(36),
         name: activityFormName,
         defaultLocation: activityFormLocation,
         imageUrl: activityFormImageUrl,
