@@ -56,6 +56,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const queryClient = useQueryClient();
   const { selectedOrg } = useOrgStore();
   const isMagna = selectedOrg?.slug === 'magna';
+  const isPedraza = selectedOrg?.slug === 'pedraza';
 
   // ── Media/content state ───────────────────────────────────────────────────
   const [items, setItems] = useState<any[]>([]);
@@ -607,8 +608,8 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
         </p>
       )}
 
-      {/* ── Totem: activity catalog + schedule ── */}
-      {screen?.screenType === 'totem' && (
+      {/* ── Totem: activity catalog + schedule (hidden for Pedraza) ── */}
+      {screen?.screenType === 'totem' && !isPedraza && (
         <>
           {/* ── Activity catalog ────────────────────────────────────────────── */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
