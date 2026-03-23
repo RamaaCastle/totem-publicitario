@@ -10,7 +10,6 @@ import { readFile } from 'fs/promises';
 import { promisify } from 'util';
 
 import { MediaFile, MediaType, MediaStatus } from '../../database/entities/media-file.entity';
-import { Organization } from '../../database/entities/organization.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 const unlinkAsync = promisify(unlink);
@@ -21,7 +20,6 @@ export class MediaService {
 
   constructor(
     @InjectRepository(MediaFile) private readonly mediaRepo: Repository<MediaFile>,
-    @InjectRepository(Organization) private readonly orgRepo: Repository<Organization>,
     private readonly configService: ConfigService,
   ) {}
 
