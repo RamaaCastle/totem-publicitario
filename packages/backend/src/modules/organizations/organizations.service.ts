@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { readFile } from 'fs/promises';
 import { Organization } from '../../database/entities/organization.entity';
 import { Screen, ScreenStatus } from '../../database/entities/screen.entity';
 import { MediaFile } from '../../database/entities/media-file.entity';
@@ -40,12 +41,31 @@ export class OrganizationsService {
   }
 
   async uploadLogo(organizationId: string, file: Express.Multer.File): Promise<Organization> {
-    const apiUrl = this.configService.get<string>('app.apiUrl', 'http://localhost:3001');
-    const relativePath = file.path.replace(/\\/g, '/');
-    const uploadsIdx = relativePath.indexOf('uploads/');
-    const rel = uploadsIdx >= 0 ? relativePath.slice(uploadsIdx + 'uploads'.length) : `/${relativePath}`;
-    const logoUrl = `${apiUrl}/api/v1/media/files${rel}`;
+    const cloudName = this.configService.get<string>('app.cloudinaryCloudName', 'dnyuwzead');
+    const uploadPreset = this.configService.get<string>('app.cloudinaryUploadPreset', 'Pedraza');
+    const logoUrl = await this.uploadToCloudinary(file, cloudName, uploadPreset);
     return this.updateMe(organizationId, { logoUrl });
+  }
+
+  private async uploadToCloudinary(file: Express.Multer.File, cloudName: string, uploadPreset: string): Promise<string> {
+    const fileBuffer = await readFile(file.path);
+    const base64File = fileBuffer.toString('base64');
+    const dataUri = `data:${file.mimetype};base64,${base64File}`;
+
+    const formData = new FormData();
+    formData.append('file', dataUri);
+    formData.append('upload_preset', uploadPreset);
+
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
+    const response = await fetch(url, { method: 'POST', body: formData });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new BadRequestException(`Cloudinary upload failed: ${text}`);
+    }
+
+    const data: any = await response.json();
+    return data.secure_url as string;
   }
 
   async getDashboardStats(organizationId: string) {
