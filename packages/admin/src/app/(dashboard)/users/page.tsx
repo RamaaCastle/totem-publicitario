@@ -72,12 +72,7 @@ export default function UsersPage() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setVerifyEmail(newEmail);
-      setVerifyDigits(['', '', '', '', '', '']);
-      setVerifyError('');
-      setStep('verify');
-      // focus first digit after render
-      setTimeout(() => digitRefs.current[0]?.focus(), 100);
+      setStep('done');
     },
     onError: (err: any) => {
       setCreateError(err.response?.data?.message ?? 'Error al crear usuario');
