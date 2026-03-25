@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Users, Shield, Mail, UserCheck, UserX, Save, X, CheckCircle, RefreshCw } from 'lucide-react';
+import { Plus, Users, Shield, Mail, UserCheck, UserX, Save, X, CheckCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
@@ -101,6 +101,11 @@ export default function UsersPage() {
   const resendMutation = useMutation({
     mutationFn: () => apiClient.post('/api/v1/auth/resend-verification', { email: verifyEmail }),
     onSuccess: () => { setResendOk(true); setTimeout(() => setResendOk(false), 3000); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/users/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 
   const handleDigitChange = (index: number, value: string) => {
@@ -253,6 +258,15 @@ export default function UsersPage() {
                             title="Activar"
                           >
                             <UserCheck className="w-4 h-4" />
+                          </button>
+                        )}
+                        {!u.isSuperAdmin && (
+                          <button
+                            onClick={() => { if (confirm(`¿Eliminár a ${u.name}?`)) deleteMutation.mutate(u.id); }}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
