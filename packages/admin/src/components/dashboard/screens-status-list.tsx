@@ -1,26 +1,39 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { Wifi, WifiOff, MapPin } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { apiClient } from '@/lib/api/client';
 
-interface Screen {
-  id: string;
-  name: string;
-  status: string;
-  location?: string;
-  deviceCode: string;
-  lastSeenAt?: string;
-}
+export function ScreensStatusList() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard-screens'],
+    queryFn: () => apiClient.get('/api/v1/screens?limit=50'),
+    refetchInterval: 15000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
 
-export function ScreensStatusList({ screens }: { screens: Screen[] }) {
+  const screens: any[] = data?.data?.data?.items ?? [];
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
       <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
         <h2 className="font-semibold text-slate-900 dark:text-white">Estado de pantallas</h2>
       </div>
       <div className="divide-y divide-slate-50 dark:divide-slate-700/50">
-        {screens.length === 0 ? (
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="px-5 py-3 animate-pulse flex gap-4 items-center">
+              <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 flex-shrink-0" />
+              <div className="flex-1 space-y-1">
+                <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded w-1/2" />
+                <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded w-1/3" />
+              </div>
+            </div>
+          ))
+        ) : screens.length === 0 ? (
           <p className="px-5 py-8 text-center text-slate-400 text-sm">
             No hay pantallas registradas
           </p>

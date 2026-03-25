@@ -1,9 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  Monitor, MonitorOff, Image, Video, Play, TrendingUp, Wifi, WifiOff,
-} from 'lucide-react';
+import { Monitor, Image, Wifi, WifiOff } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
 import { StatCard } from '@/components/dashboard/stat-card';
@@ -17,13 +15,9 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => apiClient.get('/api/v1/organizations/dashboard'),
-    refetchInterval: 30000, // refresh every 30s
-  });
-
-  const { data: screensData } = useQuery({
-    queryKey: ['screens', { page: 1, limit: 10 }],
-    queryFn: () => apiClient.get('/api/v1/screens?page=1&limit=10'),
-    refetchInterval: 15000,
+    refetchInterval: 30000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const s = stats?.data?.data;
@@ -80,7 +74,7 @@ export default function DashboardPage() {
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <ScreensStatusList screens={screensData?.data?.data?.items ?? []} />
+          <ScreensStatusList />
         </div>
         <div>
           <RecentActivity />
