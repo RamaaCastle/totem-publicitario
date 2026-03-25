@@ -1,7 +1,8 @@
 import {
   Controller, Get, Post, Put, Patch, Delete, Body, Param, Query,
-  ParseUUIDPipe, HttpCode, HttpStatus,
+  ParseUUIDPipe, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
+import { UserStatus } from '../../database/entities/user.entity';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 import { UsersService } from './users.service';
@@ -56,6 +57,19 @@ export class UsersController {
     @CurrentUser() user: User,
   ) {
     return this.usersService.update(id, dto, user.isSuperAdmin ? undefined : user.organizationId);
+  }
+
+  @Patch(':id/status')
+  @RequirePermissions('users:update')
+  @ApiOperation({ summary: 'Update user status' })
+  updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('status') status: string,
+  ) {
+    if (!Object.values(UserStatus).includes(status as UserStatus)) {
+      throw new BadRequestException(`Invalid status: ${status}`);
+    }
+    return this.usersService.updateStatus(id, status as UserStatus);
   }
 
   @Delete(':id')

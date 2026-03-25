@@ -98,9 +98,15 @@ export default function UsersPage() {
     onSuccess: () => { setResendOk(true); setTimeout(() => setResendOk(false), 3000); },
   });
 
+  const [deleteError, setDeleteError] = useState('');
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/users/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onError: (err: any) => {
+      setDeleteError(err.response?.data?.message ?? 'Error al eliminar usuario');
+      setTimeout(() => setDeleteError(''), 4000);
+    },
   });
 
   const handleDigitChange = (index: number, value: string) => {
@@ -165,6 +171,12 @@ export default function UsersPage() {
           <Plus className="w-4 h-4" /> Nuevo usuario
         </button>
       </div>
+
+      {deleteError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm px-4 py-3 rounded-lg">
+          {deleteError}
+        </div>
+      )}
 
       {/* Users table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">

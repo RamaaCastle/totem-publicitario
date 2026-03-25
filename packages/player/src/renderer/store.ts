@@ -45,8 +45,8 @@ interface PlayerState {
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   deviceCode: null,
   deviceToken: null,
-  apiUrl: 'http://localhost:3001',
-  wsUrl: 'ws://localhost:3001',
+  apiUrl: 'http://187.77.53.136',
+  wsUrl: 'ws://187.77.53.136',
   initialized: false,
   playlist: null,
   currentIndex: 0,
@@ -58,8 +58,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setConfig: (config) => set({
     deviceCode: config.deviceCode || null,
     deviceToken: config.deviceToken || null,
-    apiUrl: config.apiUrl || 'http://localhost:3001',
-    wsUrl: config.wsUrl || 'ws://localhost:3001',
+    apiUrl: config.apiUrl || 'http://187.77.53.136',
+    wsUrl: config.wsUrl || 'ws://187.77.53.136',
     initialized: true,
   }),
 
