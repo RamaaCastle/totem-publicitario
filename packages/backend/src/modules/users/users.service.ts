@@ -67,35 +67,16 @@ export class UsersService {
       roles = await this.roleRepo.findBy({ id: In(dto.roleIds) });
     }
 
-    // Generate 6-digit verification code, expires in 30 minutes
-    const verificationCode        = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationCodeExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
-
     const user = this.userRepo.create({
       ...dto,
       email: dto.email.toLowerCase(),
       password: hashedPassword,
       organizationId,
       roles,
-      status: UserStatus.PENDING,
-      verificationCode,
-      verificationCodeExpiresAt,
+      status: UserStatus.ACTIVE,
     });
 
-    const saved = await this.userRepo.save(user);
-
-    // Send activation email (non-blocking — don't fail user creation if mail fails)
-    const org = await this.orgRepo.findOne({ where: { id: organizationId } });
-    this.mailService
-      .sendVerificationCode({
-        to:      saved.email,
-        name:    saved.name,
-        code:    verificationCode,
-        orgName: org?.name ?? 'Signage Platform',
-      })
-      .catch((err) => this.logger.error(`Email send failed for ${saved.email}: ${err.message}`));
-
-    return saved;
+    return this.userRepo.save(user);
   }
 
   async update(id: string, dto: UpdateUserDto, organizationId?: string): Promise<User> {
