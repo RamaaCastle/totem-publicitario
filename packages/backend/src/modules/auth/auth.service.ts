@@ -117,7 +117,17 @@ export class AuthService {
       throw new UnauthorizedException('Access denied');
     }
 
-    const tokens = await this.generateTokens(user);
+    // Preserve the effective organizationId from the outgoing refresh token
+    // (super admins operate under a selected org that differs from their stored null org)
+    let effectiveOrgId: string | null | undefined;
+    try {
+      const payload = this.jwtService.decode(refreshToken) as JwtPayload;
+      effectiveOrgId = payload?.organizationId ?? undefined;
+    } catch {
+      effectiveOrgId = undefined;
+    }
+
+    const tokens = await this.generateTokens(user, effectiveOrgId ?? undefined);
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, 10);
     await this.userRepo.update(user.id, { refreshTokenHash: hashedRefresh });
 
