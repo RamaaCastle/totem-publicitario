@@ -8,8 +8,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Signage Platform — Admin',
-  description: 'Professional Digital Signage Management Platform',
+  title: 'Grupo Pedraza — Admin',
+  description: 'Panel administrativo Grupo Pedraza',
   robots: 'noindex, nofollow',
 };
 
