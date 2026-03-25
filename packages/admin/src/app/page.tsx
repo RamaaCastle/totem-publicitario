@@ -162,22 +162,26 @@ export default function OrgSelectPage() {
         {/* Content */}
         <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-          {/* Badge */}
+          {/* Header */}
           <div style={{
             animation: ready ? 'fadeUp 0.5s ease both' : 'none', opacity: ready ? undefined : 0,
-            marginBottom: 40, display: 'flex', alignItems: 'center', gap: 10,
+            marginBottom: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
           }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(12px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20,
-            }}>📺</div>
-            <div>
-              <p style={{ color: 'white', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>Signage Platform</p>
-              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2 }}>Panel Administrativo</p>
+            {/* Circular logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/grupopedraza.png"
+              alt="Grupo Pedraza"
+              style={{
+                width: 80, height: 80, borderRadius: '50%', objectFit: 'cover',
+                border: '2px solid rgba(255,255,255,0.15)',
+                boxShadow: '0 0 32px rgba(255,255,255,0.08)',
+              }}
+            />
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>Marketing digital</p>
+              <p style={{ color: 'white', fontWeight: 800, fontSize: 22, margin: '4px 0 2px', letterSpacing: '-0.02em' }}>Grupo Pedraza</p>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, margin: 0 }}>Panel Administrativo</p>
             </div>
           </div>
 
