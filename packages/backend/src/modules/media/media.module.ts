@@ -10,12 +10,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { MediaFile } from '../../database/entities/media-file.entity';
-import { Organization } from '../../database/entities/organization.entity';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([MediaFile, Organization]),
+    TypeOrmModule.forFeature([MediaFile]),
     MulterModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
