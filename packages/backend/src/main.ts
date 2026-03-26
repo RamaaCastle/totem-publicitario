@@ -98,9 +98,9 @@ async function bootstrap() {
   const server = app.getHttpAdapter().getInstance();
 
   // Serve APK downloads — registered before the admin SPA catch-all
-  const expressStatic = (await import('express')).static;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const downloadsPath = process.env.DOWNLOADS_PATH || join(__dirname, '..', 'downloads');
-  server.use('/downloads', expressStatic(downloadsPath));
+  server.use('/downloads', require('express').static(downloadsPath));
 
   server.get('*', (req: any, res: any, next: any) => {
     const match = dynamicRoutes.find((r) => r.pattern.test(req.path));
