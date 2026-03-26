@@ -1,9 +1,11 @@
 import {
-  Controller, Post, Get, Body, Param, Req, HttpCode, HttpStatus,
+  Controller, Post, Get, Body, Param, Req, Res, HttpCode, HttpStatus, NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
 import { DevicesService } from './devices.service';
 import { Public } from '../../common/decorators/permissions.decorator';
@@ -51,6 +53,19 @@ export class DevicesController {
       versionName: process.env.PLAYER_VERSION_NAME || '1.0.0',
       apkUrl: process.env.PLAYER_APK_URL || '',
     };
+  }
+
+  /**
+   * Serves APK files from the downloads directory.
+   */
+  @Get('download/:filename')
+  @Public()
+  @ApiOperation({ summary: 'Download player APK file' })
+  downloadFile(@Param('filename') filename: string, @Res() res: Response) {
+    const downloadsPath = process.env.DOWNLOADS_PATH || '/app/downloads';
+    const filePath = join(downloadsPath, filename);
+    if (!existsSync(filePath)) throw new NotFoundException('File not found');
+    res.download(filePath);
   }
 
   @Post('heartbeat/:deviceCode')
