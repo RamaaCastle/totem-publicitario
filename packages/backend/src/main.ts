@@ -96,6 +96,12 @@ async function bootstrap() {
   ];
 
   const server = app.getHttpAdapter().getInstance();
+
+  // Serve APK downloads — registered before the admin SPA catch-all
+  const expressStatic = (await import('express')).static;
+  const downloadsPath = process.env.DOWNLOADS_PATH || join(__dirname, '..', 'downloads');
+  server.use('/downloads', expressStatic(downloadsPath));
+
   server.get('*', (req: any, res: any, next: any) => {
     const match = dynamicRoutes.find((r) => r.pattern.test(req.path));
     if (match) {
