@@ -173,9 +173,13 @@ export function PlayerScreen() {
   const nextItemData = playlist.items[nextIdx];
 
   // When currentIndex changes, update video src via ref (no remount)
+  const prevMediaUrlRef = useRef<string>('');
   useEffect(() => {
     const vid = videoRef.current;
     if (!vid || item.media.type !== 'video') return;
+    // Only reload if the URL actually changed (avoid interrupting initial autoPlay)
+    if (prevMediaUrlRef.current === mediaUrl) return;
+    prevMediaUrlRef.current = mediaUrl;
     vid.src = mediaUrl;
     vid.load();
     vid.play().catch(() => {});
