@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { usePlayerStore } from '../store';
 import { TotemCalendarScreen } from './totem-calendar-screen';
@@ -20,7 +20,7 @@ export function PlayerScreen() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const configIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [playIteration, setPlayIteration] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // ── Fetch playlist config from server ───────────────────────────────────────
   const fetchConfig = useCallback(async () => {
@@ -168,8 +168,20 @@ export function PlayerScreen() {
 
   const isSingleItem = playlist.items.length === 1;
 
+  // Next item for preloading
+  const nextIdx = (currentIndex + 1) % playlist.items.length;
+  const nextItemData = playlist.items[nextIdx];
+
+  // When currentIndex changes, update video src via ref (no remount)
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid || item.media.type !== 'video') return;
+    vid.src = mediaUrl;
+    vid.load();
+    vid.play().catch(() => {});
+  }, [currentIndex, mediaUrl]); // eslint-disable-line
+
   const handleVideoEnded = () => {
-    setPlayIteration((n) => n + 1);
     nextItem();
   };
 
@@ -188,7 +200,7 @@ export function PlayerScreen() {
     <div style={containerStyle}>
       {item.media.type === 'image' ? (
         <img
-          key={`${item.id}-${playIteration}`}
+          key={item.id}
           src={mediaUrl}
           alt=""
           style={{
@@ -198,17 +210,30 @@ export function PlayerScreen() {
         />
       ) : (
         <video
-          key={`${item.id}-${playIteration}`}
+          ref={videoRef}
           src={mediaUrl}
           autoPlay
           muted
           playsInline
+          preload="auto"
           loop={isSingleItem}
           onEnded={!isSingleItem ? handleVideoEnded : undefined}
           style={{
             width: '100%', height: '100%', objectFit: 'cover',
             position: 'absolute', inset: 0,
           }}
+        />
+      )}
+
+      {/* Preload next video in background */}
+      {!isSingleItem && nextItemData?.media.type === 'video' && nextItemData.media.url !== mediaUrl && (
+        <video
+          key={`preload-${nextItemData.id}`}
+          src={nextItemData.media.url}
+          preload="auto"
+          muted
+          playsInline
+          style={{ display: 'none' }}
         />
       )}
 
