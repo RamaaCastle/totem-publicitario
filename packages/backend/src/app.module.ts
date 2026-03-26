@@ -64,7 +64,7 @@ import { MailModule } from './modules/mail/mail.module';
       rootPath: process.env.NODE_ENV === 'production'
         ? join(__dirname, 'public')
         : join(__dirname, '../../admin/out'),
-      exclude: ['/api*', '/socket.io*'],
+      exclude: ['/api*', '/socket.io*', '/downloads*'],
       serveStaticOptions: { fallthrough: true },
     }),
 
