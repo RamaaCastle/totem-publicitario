@@ -68,6 +68,13 @@ import { MailModule } from './modules/mail/mail.module';
       serveStaticOptions: { fallthrough: true },
     }),
 
+    // Serve APK downloads from /downloads/ path (EasyPanel volume: /app/downloads)
+    ServeStaticModule.forRoot({
+      rootPath: process.env.DOWNLOADS_PATH || join(__dirname, '..', 'downloads'),
+      serveRoot: '/downloads',
+      serveStaticOptions: { fallthrough: true },
+    }),
+
     // Feature modules
     AuthModule,
     UsersModule,

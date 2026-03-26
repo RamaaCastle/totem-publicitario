@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { usePlayerStore } from '../store';
 import { TotemCalendarScreen } from './totem-calendar-screen';
@@ -21,6 +21,7 @@ export function PlayerScreen() {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const configIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const prevMediaUrlRef = useRef<string>('');
 
   // ── Fetch playlist config from server ───────────────────────────────────────
   const fetchConfig = useCallback(async () => {
@@ -138,6 +139,20 @@ export function PlayerScreen() {
     };
   }, [currentIndex, playlist, nextItem]);
 
+  // ── Update video src when currentIndex changes ────────────────────────────────
+  useEffect(() => {
+    const item = playlist?.items?.[currentIndex];
+    if (!item || item.media.type !== 'video') return;
+    const mediaUrl = item.media.url;
+    const vid = videoRef.current;
+    if (!vid) return;
+    if (prevMediaUrlRef.current === mediaUrl) return;
+    prevMediaUrlRef.current = mediaUrl;
+    vid.src = mediaUrl;
+    vid.load();
+    vid.play().catch(() => {});
+  }, [currentIndex, playlist]); // eslint-disable-line
+
   // ── Render ───────────────────────────────────────────────────────────────────
   // Totem with schedule → show calendar (with portrait rotation support)
   if (screenType === 'totem' && schedule && schedule.length > 0) {
@@ -171,19 +186,6 @@ export function PlayerScreen() {
   // Next item for preloading
   const nextIdx = (currentIndex + 1) % playlist.items.length;
   const nextItemData = playlist.items[nextIdx];
-
-  // When currentIndex changes, update video src via ref (no remount)
-  const prevMediaUrlRef = useRef<string>('');
-  useEffect(() => {
-    const vid = videoRef.current;
-    if (!vid || item.media.type !== 'video') return;
-    // Only reload if the URL actually changed (avoid interrupting initial autoPlay)
-    if (prevMediaUrlRef.current === mediaUrl) return;
-    prevMediaUrlRef.current = mediaUrl;
-    vid.src = mediaUrl;
-    vid.load();
-    vid.play().catch(() => {});
-  }, [currentIndex, mediaUrl]); // eslint-disable-line
 
   const handleVideoEnded = () => {
     nextItem();
@@ -221,6 +223,8 @@ export function PlayerScreen() {
           playsInline
           preload="auto"
           loop={isSingleItem}
+          poster="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAABjE+ibYAAAAASUVORK5CYII="
+          onCanPlay={() => videoRef.current?.play().catch(() => {})}
           onEnded={!isSingleItem ? handleVideoEnded : undefined}
           style={{
             width: '100%', height: '100%', objectFit: 'cover',

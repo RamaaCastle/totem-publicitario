@@ -38,6 +38,21 @@ export class DevicesController {
   /**
    * Player sends heartbeat every 30 seconds.
    */
+  /**
+   * Returns the current player app version + APK download URL.
+   * Used by the player to self-update.
+   */
+  @Get('version')
+  @Public()
+  @ApiOperation({ summary: 'Get current player app version' })
+  getPlayerVersion() {
+    return {
+      versionCode: parseInt(process.env.PLAYER_VERSION_CODE || '1', 10),
+      versionName: process.env.PLAYER_VERSION_NAME || '1.0.0',
+      apkUrl: process.env.PLAYER_APK_URL || '',
+    };
+  }
+
   @Post('heartbeat/:deviceCode')
   @Public()
   @HttpCode(HttpStatus.OK)
