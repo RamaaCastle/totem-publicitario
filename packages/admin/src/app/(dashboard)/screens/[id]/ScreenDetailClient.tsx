@@ -75,9 +75,9 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const [hotelInfo, setHotelInfo] = useState<HotelInfoItem[]>([]);
   const [hotelInfoLoaded, setHotelInfoLoaded] = useState(false);
   const [hotelInfoSaved, setHotelInfoSaved] = useState(false);
-  const [hotelInfoBg, setHotelInfoBg] = useState<string>('');
-  const [uploadingHotelBg, setUploadingHotelBg] = useState(false);
+  const [uploadingHotelItemId, setUploadingHotelItemId] = useState<string | null>(null);
   const hotelBgRef = useRef<HTMLInputElement>(null);
+  const hotelBgTargetId = useRef<string | null>(null);
 
   // ── Activity catalog state ─────────────────────────────────────────────────
   const [activities, setActivities] = useState<ActivityTemplate[]>([]);
@@ -142,7 +142,6 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   useEffect(() => {
     if (screen && !hotelInfoLoaded) {
       setHotelInfo(screen.metadata?.hotelInfo ?? []);
-      setHotelInfoBg(screen.metadata?.hotelInfoBg ?? '');
       setHotelInfoLoaded(true);
     }
   }, [screen, hotelInfoLoaded]);
@@ -344,23 +343,26 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   // ── Hotel info mutations + helpers ────────────────────────────────────────
   const handleHotelBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingHotelBg(true);
+    const targetId = hotelBgTargetId.current;
+    if (!file || !targetId) return;
+    setUploadingHotelItemId(targetId);
     try {
       const form = new FormData();
       form.append('file', file);
       form.append('upload_preset', 'Pedraza');
       const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
       const json = await res.json();
-      if (json?.secure_url) setHotelInfoBg(json.secure_url);
+      if (json?.secure_url)
+        setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, bgImageUrl: json.secure_url } : i));
     } catch { /* silent */ } finally {
-      setUploadingHotelBg(false);
+      setUploadingHotelItemId(null);
+      hotelBgTargetId.current = null;
       if (hotelBgRef.current) hotelBgRef.current.value = '';
     }
   };
 
   const saveHotelInfoMutation = useMutation({
-    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo, bgImageUrl: hotelInfoBg || undefined }),
+    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['screen', id] });
       setHotelInfoSaved(true);
@@ -932,31 +934,8 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
           </div>
 
           <div className="p-4 space-y-2">
-            {/* Background image */}
+            {/* Hidden file input for per-item bg upload */}
             <input ref={hotelBgRef} type="file" accept="image/*" className="hidden" onChange={handleHotelBgUpload} />
-            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100 dark:border-slate-700">
-              <button
-                onClick={() => hotelBgRef.current?.click()}
-                disabled={uploadingHotelBg}
-                className="w-24 h-16 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-amber-400 bg-slate-50 dark:bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 transition"
-              >
-                {uploadingHotelBg ? (
-                  <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                ) : hotelInfoBg ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={hotelInfoBg} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs text-slate-400 text-center leading-tight px-1">Imagen de fondo</span>
-                )}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Imagen de fondo</p>
-                <p className="text-xs text-slate-400">Se muestra detrás del contenido de la TV</p>
-                {hotelInfoBg && (
-                  <button onClick={() => setHotelInfoBg('')} className="text-xs text-red-500 hover:underline mt-1">Quitar imagen</button>
-                )}
-              </div>
-            </div>
 
             {hotelInfo.length === 0 && (
               <p className="text-slate-400 text-sm py-2 text-center">
@@ -965,24 +944,55 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
             )}
 
             {hotelInfo.map((item) => (
-              <div key={item.id} className="flex items-center gap-2 group">
-                <input
-                  type="text"
-                  value={item.label}
-                  onChange={(e) => updateHotelInfoItem(item.id, 'label', e.target.value)}
-                  placeholder="Etiqueta (ej: Check in)"
-                  className="w-40 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 flex-shrink-0"
-                />
-                <input
-                  type="text"
-                  value={item.value}
-                  onChange={(e) => updateHotelInfoItem(item.id, 'value', e.target.value)}
-                  placeholder="Valor (ej: 15:00 — o para WiFi: Red | Contraseña)"
-                  className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
+              <div key={item.id} className="flex items-start gap-2 group">
+                {/* Per-item bg image button */}
+                <button
+                  onClick={() => { hotelBgTargetId.current = item.id; hotelBgRef.current?.click(); }}
+                  disabled={uploadingHotelItemId === item.id}
+                  className="w-14 h-14 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-amber-400 bg-slate-50 dark:bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 transition"
+                  title="Imagen de fondo para este ítem"
+                >
+                  {uploadingHotelItemId === item.id ? (
+                    <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  ) : item.bgImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.bgImageUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Upload className="w-4 h-4 text-slate-300" />
+                  )}
+                </button>
+
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <input
+                    type="text"
+                    value={item.label}
+                    onChange={(e) => updateHotelInfoItem(item.id, 'label', e.target.value)}
+                    placeholder="Etiqueta (ej: Check in)"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <div className="flex gap-1.5 items-center">
+                    <input
+                      type="text"
+                      value={item.value}
+                      onChange={(e) => updateHotelInfoItem(item.id, 'value', e.target.value)}
+                      placeholder="Valor (ej: 15:00 — o para WiFi: Red | Contraseña)"
+                      className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    {item.bgImageUrl && (
+                      <button
+                        onClick={() => setHotelInfo((prev) => prev.map((i) => i.id === item.id ? { ...i, bgImageUrl: undefined } : i))}
+                        className="text-xs text-slate-400 hover:text-red-500 transition flex-shrink-0"
+                        title="Quitar imagen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   onClick={() => removeHotelInfoItem(item.id)}
-                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition p-1.5 flex-shrink-0"
+                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition p-1.5 flex-shrink-0 mt-1"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

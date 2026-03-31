@@ -1,37 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-interface HotelInfoItem {
+export interface HotelInfoItem {
   id: string;
   label: string;
   value: string;
+  bgImageUrl?: string;
 }
 
 interface TVInfoScreenProps {
   items: HotelInfoItem[];
-  bgImageUrl?: string;
   slideDurationMs?: number;
+  /** Called once all items have been shown one full cycle */
+  onComplete?: () => void;
 }
 
 const SLIDE_MS = 5000;
 const ANIM_MS = 500;
 
-export function TVInfoScreen({ items, bgImageUrl, slideDurationMs = SLIDE_MS }: TVInfoScreenProps) {
+export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: TVInfoScreenProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'show' | 'out'>('in');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const total = items.length;
 
   useEffect(() => {
     if (total === 0) return;
     setPhase('in');
-
     const inDone = setTimeout(() => setPhase('show'), ANIM_MS);
 
     timerRef.current = setTimeout(() => {
       setPhase('out');
       setTimeout(() => {
-        setCurrentIdx((prev) => (prev + 1) % total);
+        const nextIdx = (currentIdx + 1) % total;
+        if (nextIdx === 0) {
+          // Completed one full cycle
+          onCompleteRef.current?.();
+        } else {
+          setCurrentIdx(nextIdx);
+        }
       }, ANIM_MS);
     }, slideDurationMs);
 
@@ -69,40 +78,43 @@ export function TVInfoScreen({ items, bgImageUrl, slideDurationMs = SLIDE_MS }: 
         }
       `}</style>
 
-      {/* Background: image or solid red */}
-      {bgImageUrl ? (
+      {/* Per-item background */}
+      {item.bgImageUrl ? (
         <>
           <div
-            key={bgImageUrl}
+            key={item.bgImageUrl + currentIdx}
             style={{
               position: 'absolute', inset: 0,
-              backgroundImage: `url(${bgImageUrl})`,
+              backgroundImage: `url(${item.bgImageUrl})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              animation: 'fade-bg 0.8s ease forwards',
+              animation: 'fade-bg 0.6s ease forwards',
             }}
           />
-          {/* Dark overlay so text stays readable */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(135deg, rgba(200,16,46,0.82) 0%, rgba(120,0,20,0.88) 100%)',
+            background: 'linear-gradient(135deg, rgba(200,16,46,0.85) 0%, rgba(120,0,20,0.90) 100%)',
           }} />
         </>
       ) : (
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, #c8102e 0%, #8b0000 100%)',
-        }} />
+        <div
+          key={`solid-${currentIdx}`}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(135deg, #c8102e 0%, #8b0000 100%)',
+            animation: 'fade-bg 0.4s ease forwards',
+          }}
+        />
       )}
 
-      {/* Texture / grain overlay */}
+      {/* Texture overlay */}
       <div style={{
         position: 'absolute', inset: 0,
         background: 'radial-gradient(ellipse at 20% 50%, rgba(255,255,255,0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
         pointerEvents: 'none',
       }} />
 
-      {/* Top white accent bar */}
+      {/* Top white bar */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: '#fff', opacity: 0.9 }} />
 
       {/* Header */}
@@ -113,54 +125,38 @@ export function TVInfoScreen({ items, bgImageUrl, slideDurationMs = SLIDE_MS }: 
         borderBottom: '1px solid rgba(255,255,255,0.2)',
       }}>
         <span style={{
-          color: '#fff',
-          fontSize: 13,
-          fontWeight: 900,
-          letterSpacing: 6,
-          textTransform: 'uppercase',
-          opacity: 0.9,
+          color: '#fff', fontSize: 13, fontWeight: 900,
+          letterSpacing: 6, textTransform: 'uppercase', opacity: 0.9,
         }}>
           Información del hotel
         </span>
         <ClockDisplay />
       </div>
 
-      {/* Main slide content */}
+      {/* Main slide */}
       <div style={{
         position: 'absolute', inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
         padding: '100px 80px 90px',
       }}>
         <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 28,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 28,
           transform: `translateY(${slideY})`,
           opacity: slideOpacity,
           transition: `transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1), opacity ${ANIM_MS}ms ease`,
-          width: '100%',
-          textAlign: 'center',
-          maxWidth: 900,
+          width: '100%', textAlign: 'center', maxWidth: 900,
         }}>
           {/* Label chip */}
           <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 10,
+            display: 'inline-flex', alignItems: 'center', gap: 10,
             background: 'rgba(255,255,255,0.18)',
             backdropFilter: 'blur(4px)',
             border: '2px solid rgba(255,255,255,0.35)',
-            color: '#fff',
-            fontSize: 15,
-            fontWeight: 900,
-            letterSpacing: 5,
-            textTransform: 'uppercase',
-            padding: '10px 30px',
-            borderRadius: 50,
+            color: '#fff', fontSize: 15, fontWeight: 900,
+            letterSpacing: 5, textTransform: 'uppercase',
+            padding: '10px 30px', borderRadius: 50,
           }}>
             <span style={{ fontSize: 20 }}>{getLabelIcon(item.label)}</span>
             {item.label}
@@ -184,11 +180,8 @@ export function TVInfoScreen({ items, bgImageUrl, slideDurationMs = SLIDE_MS }: 
         </div>
       </div>
 
-      {/* Bottom: dots + progress */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        padding: '0 56px 20px',
-      }}>
+      {/* Bottom dots + progress */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 56px 20px' }}>
         {total > 1 && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
             {items.map((_, i) => (
@@ -202,14 +195,11 @@ export function TVInfoScreen({ items, bgImageUrl, slideDurationMs = SLIDE_MS }: 
             ))}
           </div>
         )}
-
-        {/* Progress bar */}
         <div style={{ height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
           <div
             key={`${currentIdx}-prog`}
             style={{
-              height: '100%',
-              background: '#fff',
+              height: '100%', background: '#fff',
               transformOrigin: 'left',
               animation: `progress-bar ${slideDurationMs}ms linear forwards`,
             }}
