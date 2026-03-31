@@ -8,38 +8,35 @@ interface HotelInfoItem {
 
 interface TVInfoScreenProps {
   items: HotelInfoItem[];
-  /** Duration per slide in ms (default 5000) */
+  bgImageUrl?: string;
   slideDurationMs?: number;
 }
 
 const SLIDE_MS = 5000;
-const ANIM_MS = 600;
+const ANIM_MS = 500;
 
-export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS }: TVInfoScreenProps) {
+export function TVInfoScreen({ items, bgImageUrl, slideDurationMs = SLIDE_MS }: TVInfoScreenProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [animState, setAnimState] = useState<'enter' | 'idle' | 'exit'>('enter');
+  const [phase, setPhase] = useState<'in' | 'show' | 'out'>('in');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const total = items.length;
 
-  // Auto-advance slides
   useEffect(() => {
     if (total === 0) return;
+    setPhase('in');
 
-    // Animate in
-    setAnimState('enter');
-    const enterDone = setTimeout(() => setAnimState('idle'), ANIM_MS);
+    const inDone = setTimeout(() => setPhase('show'), ANIM_MS);
 
-    // Schedule exit + advance
     timerRef.current = setTimeout(() => {
-      setAnimState('exit');
+      setPhase('out');
       setTimeout(() => {
         setCurrentIdx((prev) => (prev + 1) % total);
       }, ANIM_MS);
     }, slideDurationMs);
 
     return () => {
-      clearTimeout(enterDone);
+      clearTimeout(inDone);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [currentIdx, total, slideDurationMs]);
@@ -48,223 +45,215 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS }: TVInfoScreen
 
   const item = items[currentIdx];
   const isWifi = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
-  const parts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
-  const wifiNetwork = parts[0] ?? item.value;
-  const wifiPassword = parts[1] ?? '';
+  const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
 
-  // Animation transform
-  const translateY =
-    animState === 'enter' ? '40px' :
-    animState === 'exit' ? '-40px' : '0px';
-  const opacity =
-    animState === 'idle' ? 1 : 0;
+  const slideOpacity = phase === 'show' ? 1 : 0;
+  const slideY = phase === 'in' ? '30px' : phase === 'out' ? '-30px' : '0px';
 
   return (
     <div style={{
       width: '100vw',
       height: '100vh',
-      background: '#0f0f0f',
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
-      overflow: 'hidden',
       position: 'relative',
+      overflow: 'hidden',
+      fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
     }}>
-      {/* CSS keyframes injected once */}
       <style>{`
-        @keyframes pulse-bar {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-        @keyframes progress {
+        @keyframes progress-bar {
           from { transform: scaleX(0); }
           to   { transform: scaleX(1); }
         }
-        @keyframes dot-pop {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.4); }
+        @keyframes fade-bg {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
 
-      {/* Top red accent bar */}
-      <div style={{ height: 6, background: '#c8102e', flexShrink: 0 }} />
+      {/* Background: image or solid red */}
+      {bgImageUrl ? (
+        <>
+          <div
+            key={bgImageUrl}
+            style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: `url(${bgImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              animation: 'fade-bg 0.8s ease forwards',
+            }}
+          />
+          {/* Dark overlay so text stays readable */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(135deg, rgba(200,16,46,0.82) 0%, rgba(120,0,20,0.88) 100%)',
+          }} />
+        </>
+      ) : (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(135deg, #c8102e 0%, #8b0000 100%)',
+        }} />
+      )}
 
-      {/* Header strip */}
+      {/* Texture / grain overlay */}
       <div style={{
-        background: '#c8102e',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 60px',
-        height: 72,
-        flexShrink: 0,
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(255,255,255,0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Top white accent bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: '#fff', opacity: 0.9 }} />
+
+      {/* Header */}
+      <div style={{
+        position: 'absolute', top: 5, left: 0, right: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '18px 56px',
+        borderBottom: '1px solid rgba(255,255,255,0.2)',
       }}>
         <span style={{
           color: '#fff',
           fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: 5,
+          fontWeight: 900,
+          letterSpacing: 6,
           textTransform: 'uppercase',
+          opacity: 0.9,
         }}>
           Información del hotel
         </span>
         <ClockDisplay />
       </div>
 
-      {/* Slide area */}
+      {/* Main slide content */}
       <div style={{
-        flex: 1,
+        position: 'absolute', inset: 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '40px 80px',
-        position: 'relative',
-        overflow: 'hidden',
+        padding: '100px 80px 90px',
       }}>
-
-        {/* Animated slide content */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 24,
-          transform: `translateY(${translateY})`,
-          opacity,
+          gap: 28,
+          transform: `translateY(${slideY})`,
+          opacity: slideOpacity,
           transition: `transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1), opacity ${ANIM_MS}ms ease`,
           width: '100%',
           textAlign: 'center',
+          maxWidth: 900,
         }}>
-
-          {/* Label */}
+          {/* Label chip */}
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 12,
-            background: '#c8102e',
+            gap: 10,
+            background: 'rgba(255,255,255,0.18)',
+            backdropFilter: 'blur(4px)',
+            border: '2px solid rgba(255,255,255,0.35)',
             color: '#fff',
-            fontSize: 16,
-            fontWeight: 700,
-            letterSpacing: 4,
+            fontSize: 15,
+            fontWeight: 900,
+            letterSpacing: 5,
             textTransform: 'uppercase',
-            padding: '10px 28px',
-            borderRadius: 4,
+            padding: '10px 30px',
+            borderRadius: 50,
           }}>
-            {getLabelIcon(item.label)}
+            <span style={{ fontSize: 20 }}>{getLabelIcon(item.label)}</span>
             {item.label}
           </div>
 
           {/* Value */}
           {isWifi ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 20,
-              marginTop: 8,
-            }}>
-              <WifiValue label="Red" value={wifiNetwork} />
-              {wifiPassword && <WifiValue label="Contraseña" value={wifiPassword} mono />}
-            </div>
+            <WifiSlide network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} />
           ) : (
             <div style={{
               color: '#ffffff',
-              fontSize: item.value.length > 20 ? 56 : 96,
-              fontWeight: 200,
-              letterSpacing: -1,
+              fontSize: item.value.length > 20 ? 72 : item.value.length > 10 ? 96 : 128,
+              fontWeight: 900,
               lineHeight: 1,
-              marginTop: 8,
+              letterSpacing: -2,
+              textShadow: '0 4px 32px rgba(0,0,0,0.3)',
             }}>
               {item.value}
             </div>
           )}
         </div>
-
-        {/* Decorative side lines */}
-        <div style={{
-          position: 'absolute', left: 40, top: '50%', transform: 'translateY(-50%)',
-          width: 3, height: 120,
-          background: 'linear-gradient(180deg, transparent, #c8102e, transparent)',
-        }} />
-        <div style={{
-          position: 'absolute', right: 40, top: '50%', transform: 'translateY(-50%)',
-          width: 3, height: 120,
-          background: 'linear-gradient(180deg, transparent, #c8102e, transparent)',
-        }} />
       </div>
 
-      {/* Progress bar */}
-      {total > 1 && (
-        <div style={{ padding: '0 60px 20px', flexShrink: 0 }}>
-          {/* Dots */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
+      {/* Bottom: dots + progress */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        padding: '0 56px 20px',
+      }}>
+        {total > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
             {items.map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  width: i === currentIdx ? 28 : 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.2)',
-                  transition: 'width 0.3s ease, background 0.3s ease',
-                }}
-              />
+              <div key={i} style={{
+                height: 8,
+                width: i === currentIdx ? 32 : 8,
+                borderRadius: 4,
+                background: i === currentIdx ? '#fff' : 'rgba(255,255,255,0.35)',
+                transition: 'width 0.3s ease, background 0.3s ease',
+              }} />
             ))}
           </div>
+        )}
 
-          {/* Sliding progress bar */}
-          <div style={{
-            height: 3,
-            background: 'rgba(255,255,255,0.1)',
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}>
-            <div
-              key={`${currentIdx}-progress`}
-              style={{
-                height: '100%',
-                background: '#c8102e',
-                transformOrigin: 'left',
-                animation: `progress ${slideDurationMs}ms linear forwards`,
-              }}
-            />
-          </div>
+        {/* Progress bar */}
+        <div style={{ height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
+          <div
+            key={`${currentIdx}-prog`}
+            style={{
+              height: '100%',
+              background: '#fff',
+              transformOrigin: 'left',
+              animation: `progress-bar ${slideDurationMs}ms linear forwards`,
+            }}
+          />
         </div>
-      )}
+      </div>
 
-      {/* Bottom red bar */}
-      <div style={{ height: 6, background: '#c8102e', flexShrink: 0 }} />
+      {/* Bottom white bar */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 5, background: '#fff', opacity: 0.9 }} />
     </div>
   );
 }
 
-function WifiValue({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function WifiSlide({ network, password }: { network: string; password: string }) {
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 11,
-        letterSpacing: 3,
-        textTransform: 'uppercase',
-        fontWeight: 600,
-        marginBottom: 6,
-      }}>
-        {label}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, marginTop: 8 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 8 }}>
+          Red
+        </div>
+        <div style={{ color: '#fff', fontSize: network.length > 16 ? 48 : 64, fontWeight: 900, letterSpacing: -1 }}>
+          {network}
+        </div>
       </div>
-      <div style={{
-        color: '#fff',
-        fontSize: value.length > 18 ? 32 : 48,
-        fontWeight: mono ? 400 : 300,
-        fontFamily: mono ? 'monospace' : 'inherit',
-        letterSpacing: mono ? 3 : 0.5,
-        background: mono ? 'rgba(200,16,46,0.15)' : 'transparent',
-        border: mono ? '1px solid rgba(200,16,46,0.4)' : 'none',
-        borderRadius: 8,
-        padding: mono ? '8px 24px' : 0,
-      }}>
-        {value}
-      </div>
+      {password && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 8 }}>
+            Contraseña
+          </div>
+          <div style={{
+            color: '#fff',
+            fontSize: password.length > 16 ? 36 : 52,
+            fontWeight: 700,
+            fontFamily: 'monospace',
+            letterSpacing: 4,
+            background: 'rgba(255,255,255,0.15)',
+            border: '2px solid rgba(255,255,255,0.3)',
+            borderRadius: 12,
+            padding: '10px 32px',
+          }}>
+            {password}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -276,12 +265,7 @@ function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <span style={{
-      color: 'rgba(255,255,255,0.9)',
-      fontSize: 32,
-      fontWeight: 200,
-      letterSpacing: 3,
-    }}>
+    <span style={{ color: '#fff', fontSize: 36, fontWeight: 900, letterSpacing: 3, opacity: 0.9 }}>
       {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
     </span>
   );
@@ -299,6 +283,6 @@ function getLabelIcon(label: string): string {
   if (l.includes('gym') || l.includes('gimnasio')) return '🏋️';
   if (l.includes('restaur') || l.includes('cena') || l.includes('almuerzo')) return '🍽️';
   if (l.includes('spa')) return '💆';
-  if (l.includes('estacion') || l.includes('parking')) return '🅿️';
+  if (l.includes('parking') || l.includes('estacion')) return '🅿️';
   return '📌';
 }

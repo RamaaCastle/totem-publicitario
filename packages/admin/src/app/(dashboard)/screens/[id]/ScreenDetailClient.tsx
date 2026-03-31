@@ -75,6 +75,9 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const [hotelInfo, setHotelInfo] = useState<HotelInfoItem[]>([]);
   const [hotelInfoLoaded, setHotelInfoLoaded] = useState(false);
   const [hotelInfoSaved, setHotelInfoSaved] = useState(false);
+  const [hotelInfoBg, setHotelInfoBg] = useState<string>('');
+  const [uploadingHotelBg, setUploadingHotelBg] = useState(false);
+  const hotelBgRef = useRef<HTMLInputElement>(null);
 
   // ── Activity catalog state ─────────────────────────────────────────────────
   const [activities, setActivities] = useState<ActivityTemplate[]>([]);
@@ -139,6 +142,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   useEffect(() => {
     if (screen && !hotelInfoLoaded) {
       setHotelInfo(screen.metadata?.hotelInfo ?? []);
+      setHotelInfoBg(screen.metadata?.hotelInfoBg ?? '');
       setHotelInfoLoaded(true);
     }
   }, [screen, hotelInfoLoaded]);
@@ -338,8 +342,25 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   });
 
   // ── Hotel info mutations + helpers ────────────────────────────────────────
+  const handleHotelBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingHotelBg(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('upload_preset', 'Pedraza');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
+      const json = await res.json();
+      if (json?.secure_url) setHotelInfoBg(json.secure_url);
+    } catch { /* silent */ } finally {
+      setUploadingHotelBg(false);
+      if (hotelBgRef.current) hotelBgRef.current.value = '';
+    }
+  };
+
   const saveHotelInfoMutation = useMutation({
-    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo }),
+    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo, bgImageUrl: hotelInfoBg || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['screen', id] });
       setHotelInfoSaved(true);
@@ -911,6 +932,32 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
           </div>
 
           <div className="p-4 space-y-2">
+            {/* Background image */}
+            <input ref={hotelBgRef} type="file" accept="image/*" className="hidden" onChange={handleHotelBgUpload} />
+            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100 dark:border-slate-700">
+              <button
+                onClick={() => hotelBgRef.current?.click()}
+                disabled={uploadingHotelBg}
+                className="w-24 h-16 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-amber-400 bg-slate-50 dark:bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 transition"
+              >
+                {uploadingHotelBg ? (
+                  <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                ) : hotelInfoBg ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hotelInfoBg} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs text-slate-400 text-center leading-tight px-1">Imagen de fondo</span>
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Imagen de fondo</p>
+                <p className="text-xs text-slate-400">Se muestra detrás del contenido de la TV</p>
+                {hotelInfoBg && (
+                  <button onClick={() => setHotelInfoBg('')} className="text-xs text-red-500 hover:underline mt-1">Quitar imagen</button>
+                )}
+              </div>
+            </div>
+
             {hotelInfo.length === 0 && (
               <p className="text-slate-400 text-sm py-2 text-center">
                 Sin ítems. Agregá información del hotel (check in, WiFi, desayuno, etc.)
