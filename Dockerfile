@@ -26,7 +26,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter admin build
 
 # Build player with /player/ base path for server hosting
-RUN cd /app/packages/player && VITE_BASE_PATH=/player/ /app/node_modules/.bin/vite build
+RUN cd /app/packages/player && VITE_BASE_PATH=/player/ pnpm run build:web
 
 # Build backend
 RUN pnpm --filter backend build
