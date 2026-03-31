@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'Signage Player',
   webDir: 'dist/renderer',
   server: {
-    androidScheme: 'http',
+    url: 'http://187.77.53.136/player',
+    cleartext: true,
   },
   android: {
     allowMixedContent: true,

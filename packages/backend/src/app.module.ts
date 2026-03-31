@@ -68,6 +68,15 @@ import { MailModule } from './modules/mail/mail.module';
       serveStaticOptions: { fallthrough: true },
     }),
 
+    // Serve player web app at /player/
+    ServeStaticModule.forRoot({
+      rootPath: process.env.NODE_ENV === 'production'
+        ? join(__dirname, 'player')
+        : join(__dirname, '../../player/dist/renderer'),
+      serveRoot: '/player',
+      serveStaticOptions: { fallthrough: true },
+    }),
+
     // Serve APK downloads from /downloads/ path (EasyPanel volume: /app/downloads)
     ServeStaticModule.forRoot({
       rootPath: process.env.DOWNLOADS_PATH || join(__dirname, '..', 'downloads'),

@@ -31,7 +31,7 @@ export function PlayerScreen() {
       });
       if (res.status === 401 || res.status === 404) {
         // Screen was deleted or token revoked — unpair
-        await platform.saveConfig({});
+        await platform.saveConfig({ deviceCode: null, deviceToken: null });
         window.location.reload();
         return;
       }
@@ -80,7 +80,7 @@ export function PlayerScreen() {
     socket.on('command', (data: any) => {
       if (data.command === 'reload') window.location.reload();
       if (data.command === 'restart' || data.command === 'unpair')
-        platform.saveConfig({}).then(() => window.location.reload());
+        platform.saveConfig({ deviceCode: null, deviceToken: null }).then(() => window.location.reload());
     });
 
     socketRef.current = socket;

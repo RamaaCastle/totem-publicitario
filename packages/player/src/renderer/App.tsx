@@ -25,9 +25,9 @@ export default function App() {
         wsUrl: config.wsUrl,
       });
 
-      // Check for app update once config is loaded
+      // Check for app update after a short delay (wait for network on Android TV)
       const apiUrl = config.apiUrl || 'http://187.77.53.136';
-      checkForUpdate(apiUrl);
+      setTimeout(() => checkForUpdate(apiUrl), 5000);
 
       setLoading(false);
     });

@@ -10,12 +10,14 @@ import { ScreenGroup } from '../../database/entities/screen-group.entity';
 import { CreateScreenDto } from './dto/create-screen.dto';
 import { UpdateScreenDto } from './dto/update-screen.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { ScreensGateway } from '../../gateways/screens.gateway';
 
 @Injectable()
 export class ScreensService {
   constructor(
     @InjectRepository(Screen) private readonly screenRepo: Repository<Screen>,
     @InjectRepository(ScreenGroup) private readonly groupRepo: Repository<ScreenGroup>,
+    private readonly screensGateway: ScreensGateway,
   ) {}
 
   async findAll(
@@ -78,6 +80,8 @@ export class ScreensService {
 
   async remove(id: string, organizationId: string): Promise<void> {
     const screen = await this.findOne(id, organizationId);
+    // Notify the device to unpair before deleting
+    await this.screensGateway.sendCommand(screen.id, 'unpair').catch(() => {});
     await this.screenRepo.remove(screen);
   }
 

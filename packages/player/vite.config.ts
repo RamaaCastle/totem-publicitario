@@ -4,6 +4,7 @@ import { join } from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  base: process.env.VITE_BASE_PATH || '/',
   root: join(__dirname, 'src/renderer'),
   build: {
     outDir: join(__dirname, 'dist/renderer'),
