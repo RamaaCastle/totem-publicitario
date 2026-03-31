@@ -71,7 +71,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const [pendingDuration, setPendingDuration] = useState(10);
 
   // ── Hotel info state (Magna TVs) ──────────────────────────────────────────
-  type HotelInfoItem = { id: string; label: string; value: string };
+  type HotelInfoItem = { id: string; label: string; value: string; bgImageUrl?: string };
   const [hotelInfo, setHotelInfo] = useState<HotelInfoItem[]>([]);
   const [hotelInfoLoaded, setHotelInfoLoaded] = useState(false);
   const [hotelInfoSaved, setHotelInfoSaved] = useState(false);
