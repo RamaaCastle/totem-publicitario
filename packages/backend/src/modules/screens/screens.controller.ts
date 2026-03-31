@@ -101,6 +101,19 @@ export class ScreensController {
     return this.screensService.updateActivities(id, activities ?? [], user.organizationId);
   }
 
+  @Put(':id/hotel-info')
+  @RequirePermissions('screens:update')
+  @ApiOperation({ summary: 'Update hotel info items for TV screen' })
+  async updateHotelInfo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('hotelInfo') hotelInfo: any[],
+    @CurrentUser() user: User,
+  ) {
+    const screen = await this.screensService.updateHotelInfo(id, hotelInfo ?? [], user.organizationId);
+    await this.screensGateway.pushPlaylistUpdate(screen.id, screen.organizationId).catch(() => {});
+    return screen;
+  }
+
   @Delete(':id')
   @RequirePermissions('screens:delete')
   @HttpCode(HttpStatus.NO_CONTENT)

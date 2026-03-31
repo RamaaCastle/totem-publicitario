@@ -1,19 +1,21 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { usePlayerStore } from '../store';
 import { TotemCalendarScreen } from './totem-calendar-screen';
+import { TVInfoScreen } from './tv-info-screen';
 import { platform } from '../platform';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const FETCH_CONFIG_INTERVAL_MS = 60_000;
+const INFO_DURATION_MS = 20_000; // How long to show info screen before switching to ads
 
 export function PlayerScreen() {
   const {
     deviceCode, deviceToken, apiUrl, wsUrl,
     playlist, currentIndex, isOnline, orientation,
-    screenType, schedule,
+    screenType, schedule, hotelInfo,
     setPlaylist, setCurrentIndex, setIsOnline, setOrientation, nextItem,
-    setScreenType, setSchedule,
+    setScreenType, setSchedule, setHotelInfo,
   } = usePlayerStore();
 
   const socketRef = useRef<Socket | null>(null);
@@ -22,6 +24,16 @@ export function PlayerScreen() {
   const configIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const prevMediaUrlRef = useRef<string>('');
+
+  // ── Intercalation state ──────────────────────────────────────────────────────
+  const [showingInfo, setShowingInfo] = useState(true);
+  const adsShownRef = useRef(0);
+
+  // Intercalation is active when we have BOTH info content AND ads
+  const hasTotemInfo = screenType === 'totem' && schedule && schedule.length > 0;
+  const hasTVInfo = screenType === 'tv' && hotelInfo && hotelInfo.length > 0;
+  const hasAds = (playlist?.items?.length ?? 0) > 0;
+  const intercalateMode = (hasTotemInfo || hasTVInfo) && hasAds;
 
   // ── Fetch playlist config from server ───────────────────────────────────────
   const fetchConfig = useCallback(async () => {
@@ -44,11 +56,12 @@ export function PlayerScreen() {
       }
       if (data.data?.screen?.screenType) setScreenType(data.data.screen.screenType);
       if (data.data?.screen?.schedule !== undefined) setSchedule(data.data.screen.schedule);
+      if (data.data?.screen?.hotelInfo !== undefined) setHotelInfo(data.data.screen.hotelInfo);
 
     } catch {
       // Offline — continue with cached content
     }
-  }, [apiUrl, deviceCode, deviceToken, setPlaylist, setOrientation, setScreenType, setSchedule]); // eslint-disable-line
+  }, [apiUrl, deviceCode, deviceToken, setPlaylist, setOrientation, setScreenType, setSchedule, setHotelInfo]); // eslint-disable-line
 
   // ── WebSocket connection ─────────────────────────────────────────────────────
   const connectSocket = useCallback(() => {
@@ -121,28 +134,59 @@ export function PlayerScreen() {
     };
   }, []); // eslint-disable-line
 
+  // ── Info screen timer: after INFO_DURATION_MS switch to ads ─────────────────
+  useEffect(() => {
+    if (!intercalateMode || !showingInfo) return;
+    const timer = setTimeout(() => {
+      adsShownRef.current = 0;
+      setCurrentIndex(0);
+      setShowingInfo(false);
+    }, INFO_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [showingInfo, intercalateMode, setCurrentIndex]);
+
+  // ── Custom next-item that detects end of ad cycle ────────────────────────────
+  // Use a ref so timer/video callbacks always get the latest version
+  const nextAdItemRef = useRef<() => void>(nextItem);
+  useEffect(() => {
+    nextAdItemRef.current = () => {
+      if (intercalateMode && !showingInfo) {
+        adsShownRef.current += 1;
+        if (adsShownRef.current >= (playlist?.items?.length ?? Infinity)) {
+          adsShownRef.current = 0;
+          setCurrentIndex(0);
+          setShowingInfo(true);
+          return;
+        }
+      }
+      nextItem();
+    };
+  }); // runs every render so it captures current closure values
+
   // ── Advance to next slide after duration ─────────────────────────────────────
   useEffect(() => {
     if (!playlist?.items?.length) return;
+    if (intercalateMode && showingInfo) return; // Info timer handles switching
     const item = playlist.items[currentIndex];
     if (!item) return;
 
     // Videos advance on 'ended' event, images use timer
     if (item.media.type === 'image') {
       timerRef.current = setTimeout(() => {
-        nextItem();
+        nextAdItemRef.current();
       }, item.durationSeconds * 1000);
     }
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentIndex, playlist, nextItem]);
+  }, [currentIndex, playlist, intercalateMode, showingInfo]);
 
   // ── Update video src when currentIndex changes ────────────────────────────────
   useEffect(() => {
     const item = playlist?.items?.[currentIndex];
     if (!item || item.media.type !== 'video') return;
+    if (intercalateMode && showingInfo) return;
     const mediaUrl = item.media.url;
     const vid = videoRef.current;
     if (!vid) return;
@@ -151,27 +195,38 @@ export function PlayerScreen() {
     vid.src = mediaUrl;
     vid.load();
     vid.play().catch(() => {});
-  }, [currentIndex, playlist]); // eslint-disable-line
+  }, [currentIndex, playlist, intercalateMode, showingInfo]); // eslint-disable-line
 
   // ── Render ───────────────────────────────────────────────────────────────────
-  // Totem with schedule → show calendar (with portrait rotation support)
-  if (screenType === 'totem' && schedule && schedule.length > 0) {
-    const isPortrait = orientation === 'portrait';
-    const calendar = <TotemCalendarScreen schedule={schedule} screenName={deviceCode ?? ''} />;
-    if (!isPortrait) return calendar;
-    return (
-      <div style={{ width: '100vw', height: '100vh', background: '#000', overflow: 'hidden', position: 'relative' }}>
-        <div style={{
-          position: 'absolute',
-          width: '100vh', height: '100vw',
-          top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%) rotate(90deg)',
-          transformOrigin: 'center center',
-        }}>
-          {calendar}
+
+  // Determine if we should show the info screen right now
+  const shouldShowInfo =
+    (hasTotemInfo && (!intercalateMode || showingInfo)) ||
+    (hasTVInfo && (!intercalateMode || showingInfo));
+
+  if (shouldShowInfo) {
+    if (hasTotemInfo) {
+      const isPortrait = orientation === 'portrait';
+      const calendar = <TotemCalendarScreen schedule={schedule!} screenName={deviceCode ?? ''} />;
+      if (!isPortrait) return calendar;
+      return (
+        <div style={{ width: '100vw', height: '100vh', background: '#000', overflow: 'hidden', position: 'relative' }}>
+          <div style={{
+            position: 'absolute',
+            width: '100vh', height: '100vw',
+            top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%) rotate(90deg)',
+            transformOrigin: 'center center',
+          }}>
+            {calendar}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    if (hasTVInfo) {
+      return <TVInfoScreen items={hotelInfo!} screenName={deviceCode ?? undefined} />;
+    }
   }
 
   if (!playlist || playlist.items.length === 0) {
@@ -188,7 +243,7 @@ export function PlayerScreen() {
   const nextItemData = playlist.items[nextIdx];
 
   const handleVideoEnded = () => {
-    nextItem();
+    nextAdItemRef.current();
   };
 
   const isPortrait = orientation === 'portrait';
@@ -222,10 +277,10 @@ export function PlayerScreen() {
           muted
           playsInline
           preload="auto"
-          loop={isSingleItem}
+          loop={isSingleItem && !intercalateMode}
           poster="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAABjE+ibYAAAAASUVORK5CYII="
           onCanPlay={() => videoRef.current?.play().catch(() => {})}
-          onEnded={!isSingleItem ? handleVideoEnded : undefined}
+          onEnded={(!isSingleItem || intercalateMode) ? handleVideoEnded : undefined}
           style={{
             width: '100%', height: '100%', objectFit: 'cover',
             position: 'absolute', inset: 0,

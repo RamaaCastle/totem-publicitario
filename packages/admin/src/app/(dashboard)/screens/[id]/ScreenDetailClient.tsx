@@ -70,6 +70,12 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const [pendingMedia, setPendingMedia] = useState<{ id: string; name: string; type: string; publicUrl: string | null } | null>(null);
   const [pendingDuration, setPendingDuration] = useState(10);
 
+  // ── Hotel info state (Magna TVs) ──────────────────────────────────────────
+  type HotelInfoItem = { id: string; label: string; value: string };
+  const [hotelInfo, setHotelInfo] = useState<HotelInfoItem[]>([]);
+  const [hotelInfoLoaded, setHotelInfoLoaded] = useState(false);
+  const [hotelInfoSaved, setHotelInfoSaved] = useState(false);
+
   // ── Activity catalog state ─────────────────────────────────────────────────
   const [activities, setActivities] = useState<ActivityTemplate[]>([]);
   const [activitiesLoaded, setActivitiesLoaded] = useState(false);
@@ -129,7 +135,14 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     }
   }, [playlist, autoCampaign, campaigns, loaded]);
 
-  // Load activities + schedules from metadata
+  // Load hotel info + activities + schedules from metadata
+  useEffect(() => {
+    if (screen && !hotelInfoLoaded) {
+      setHotelInfo(screen.metadata?.hotelInfo ?? []);
+      setHotelInfoLoaded(true);
+    }
+  }, [screen, hotelInfoLoaded]);
+
   useEffect(() => {
     if (screen && !activitiesLoaded) {
       setActivities(screen.metadata?.activities ?? []);
@@ -323,6 +336,29 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
       queryClient.invalidateQueries({ queryKey: ['screen', id] });
     },
   });
+
+  // ── Hotel info mutations + helpers ────────────────────────────────────────
+  const saveHotelInfoMutation = useMutation({
+    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['screen', id] });
+      setHotelInfoSaved(true);
+      setTimeout(() => setHotelInfoSaved(false), 3000);
+    },
+  });
+
+  const addHotelInfoItem = () =>
+    setHotelInfo((prev) => [...prev, {
+      id: Math.random().toString(36).substring(2) + Date.now().toString(36),
+      label: '',
+      value: '',
+    }]);
+
+  const updateHotelInfoItem = (itemId: string, field: 'label' | 'value', val: string) =>
+    setHotelInfo((prev) => prev.map((i) => i.id === itemId ? { ...i, [field]: val } : i));
+
+  const removeHotelInfoItem = (itemId: string) =>
+    setHotelInfo((prev) => prev.filter((i) => i.id !== itemId));
 
   // ── Activity catalog mutations + helpers ──────────────────────────────────
   const saveActivitiesMutation = useMutation({
@@ -854,6 +890,73 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
             )}
           </div>
         </>
+      )}
+
+      {/* ── Magna TV: hotel info editor ── */}
+      {isMagna && screen?.screenType === 'tv' && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+            <div>
+              <h2 className="font-semibold text-slate-900 dark:text-white">Información del hotel</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Se muestra intercalado con la publicidad en la TV</p>
+            </div>
+            <button
+              onClick={() => saveHotelInfoMutation.mutate()}
+              disabled={saveHotelInfoMutation.isPending}
+              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg font-medium transition text-sm"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saveHotelInfoMutation.isPending ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+
+          <div className="p-4 space-y-2">
+            {hotelInfo.length === 0 && (
+              <p className="text-slate-400 text-sm py-2 text-center">
+                Sin ítems. Agregá información del hotel (check in, WiFi, desayuno, etc.)
+              </p>
+            )}
+
+            {hotelInfo.map((item) => (
+              <div key={item.id} className="flex items-center gap-2 group">
+                <input
+                  type="text"
+                  value={item.label}
+                  onChange={(e) => updateHotelInfoItem(item.id, 'label', e.target.value)}
+                  placeholder="Etiqueta (ej: Check in)"
+                  className="w-40 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 flex-shrink-0"
+                />
+                <input
+                  type="text"
+                  value={item.value}
+                  onChange={(e) => updateHotelInfoItem(item.id, 'value', e.target.value)}
+                  placeholder="Valor (ej: 15:00 — o para WiFi: Red | Contraseña)"
+                  className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <button
+                  onClick={() => removeHotelInfoItem(item.id)}
+                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition p-1.5 flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+
+            <button
+              onClick={addHotelInfoItem}
+              className="flex items-center gap-2 text-amber-600 hover:text-amber-700 text-sm font-medium mt-1 py-1"
+            >
+              <Plus className="w-4 h-4" /> Agregar ítem
+            </button>
+
+            <p className="text-xs text-slate-400 mt-1">
+              Para WiFi, escribí la etiqueta <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">WiFi</span> y el valor como <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">NombreRed | Contraseña</span>
+            </p>
+
+            {hotelInfoSaved && <p className="text-amber-600 text-sm mt-1">✓ Información guardada</p>}
+            {saveHotelInfoMutation.isError && <p className="text-red-500 text-sm mt-1">✗ Error al guardar</p>}
+          </div>
+        </div>
       )}
 
       {/* ── Edit modal ── */}

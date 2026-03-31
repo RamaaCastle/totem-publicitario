@@ -135,6 +135,7 @@ export class DevicesService {
         name: screen.name,
         orientation: screen.orientation,
         screenType: screen.screenType,
+        hotelInfo: screen.metadata?.hotelInfo ?? null,
         schedule: (() => {
           const todayKey = this.getArgDateKey();
           const schedules = screen.metadata?.schedules ?? {};

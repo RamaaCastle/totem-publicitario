@@ -31,6 +31,7 @@ interface PlayerState {
   orientation: 'landscape' | 'portrait';
   screenType: string | null;
   schedule: any[] | null;
+  hotelInfo: any[] | null;
 
   setConfig: (config: { deviceCode: string; deviceToken: string; apiUrl?: string; wsUrl?: string }) => void;
   setPlaylist: (playlist: Playlist | null) => void;
@@ -40,6 +41,7 @@ interface PlayerState {
   nextItem: () => void;
   setScreenType: (type: string | null) => void;
   setSchedule: (s: any[] | null) => void;
+  setHotelInfo: (info: any[] | null) => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -54,6 +56,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   orientation: 'landscape',
   screenType: null,
   schedule: null,
+  hotelInfo: null,
 
   setConfig: (config) => set({
     deviceCode: config.deviceCode || null,
@@ -87,4 +90,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setScreenType: (screenType) => set({ screenType }),
 
   setSchedule: (schedule) => set({ schedule }),
+
+  setHotelInfo: (hotelInfo) => set({ hotelInfo }),
 }));

@@ -99,6 +99,12 @@ export class ScreensService {
     return this.screenRepo.save(screen);
   }
 
+  async updateHotelInfo(id: string, hotelInfo: any[], organizationId: string): Promise<Screen> {
+    const screen = await this.findOne(id, organizationId);
+    screen.metadata = { ...(screen.metadata ?? {}), hotelInfo };
+    return this.screenRepo.save(screen);
+  }
+
   async updateHeartbeat(
     deviceCode: string,
     data: { ipAddress?: string; appVersion?: string; currentPlaylistId?: string },
