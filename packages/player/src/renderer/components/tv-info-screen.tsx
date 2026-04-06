@@ -14,37 +14,39 @@ interface TVInfoScreenProps {
 }
 
 const SLIDE_MS = 5000;
-const ANIM_MS = 500;
+const ANIM_MS = 400;
 
 export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: TVInfoScreenProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [phase, setPhase] = useState<'in' | 'show' | 'out'>('in');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [visible, setVisible] = useState(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
   const total = items.length;
 
+  // Fade in on mount and on each slide change
   useEffect(() => {
     if (total === 0) return;
-    setPhase('in');
-    const inDone = setTimeout(() => setPhase('show'), ANIM_MS);
 
-    timerRef.current = setTimeout(() => {
-      setPhase('out');
+    // Brief delay so CSS transition fires
+    const showTimer = setTimeout(() => setVisible(true), 30);
+
+    // Schedule slide exit + advance
+    const slideTimer = setTimeout(() => {
+      setVisible(false);
       setTimeout(() => {
-        const nextIdx = (currentIdx + 1) % total;
-        if (nextIdx === 0) {
+        const next = (currentIdx + 1) % total;
+        if (next === 0) {
           onCompleteRef.current?.();
         } else {
-          setCurrentIdx(nextIdx);
+          setCurrentIdx(next);
         }
       }, ANIM_MS);
     }, slideDurationMs);
 
     return () => {
-      clearTimeout(inDone);
-      if (timerRef.current) clearTimeout(timerRef.current);
+      clearTimeout(showTimer);
+      clearTimeout(slideTimer);
     };
   }, [currentIdx, total, slideDurationMs]);
 
@@ -54,9 +56,6 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
   const isWifi = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
   const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
 
-  const panelOpacity = phase === 'show' ? 1 : 0;
-  const panelX = phase === 'in' ? '-40px' : phase === 'out' ? '-40px' : '0px';
-
   return (
     <div style={{
       width: '100vw',
@@ -64,109 +63,114 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
       position: 'relative',
       overflow: 'hidden',
       fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
+      background: '#111',
     }}>
       <style>{`
         @keyframes progress-bar {
-          from { transform: scaleX(0); }
-          to   { transform: scaleX(1); }
+          from { width: 0%; }
+          to   { width: 100%; }
         }
-        @keyframes bg-fade {
-          from { opacity: 0; transform: scale(1.04); }
-          to   { opacity: 1; transform: scale(1); }
+        @keyframes bg-zoom {
+          from { transform: scale(1.05); }
+          to   { transform: scale(1); }
         }
       `}</style>
 
-      {/* Full-screen background image */}
-      {item.bgImageUrl ? (
-        <div
-          key={item.id + '-bg'}
-          style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: `url(${item.bgImageUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            animation: 'bg-fade 0.7s ease forwards',
-          }}
-        />
-      ) : (
-        <div style={{ position: 'absolute', inset: 0, background: '#1a1a1a' }} />
-      )}
+      {/* Background image — fullscreen */}
+      <div
+        key={item.id + '-bg'}
+        style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: item.bgImageUrl ? `url(${item.bgImageUrl})` : 'none',
+          backgroundColor: item.bgImageUrl ? 'transparent' : '#1c1c1c',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          animation: 'bg-zoom 0.8s ease forwards',
+        }}
+      />
 
-      {/* Left modal panel */}
+      {/* Subtle dark vignette on the right so panel has contrast */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to right, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0) 100%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* LEFT PANEL */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         bottom: 0,
-        width: 420,
+        width: 400,
         background: 'rgba(0,0,0,0.62)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
         display: 'flex',
         flexDirection: 'column',
-        transform: `translateX(${panelX})`,
-        opacity: panelOpacity,
-        transition: `transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1), opacity ${ANIM_MS}ms ease`,
+        // No backdrop-filter — unreliable on TV WebViews
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateX(0)' : 'translateX(-30px)',
+        transition: `opacity ${ANIM_MS}ms ease, transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1)`,
       }}>
-        {/* Red top accent */}
-        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
+        {/* Red top stripe */}
+        <div style={{ height: 5, background: '#c8102e', flexShrink: 0 }} />
 
-        {/* Header */}
+        {/* Clock + title */}
         <div style={{
-          padding: '24px 32px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          padding: '28px 32px 22px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           flexShrink: 0,
         }}>
+          <ClockDisplay />
           <div style={{
-            color: 'rgba(255,255,255,0.5)',
+            color: 'rgba(255,255,255,0.4)',
             fontSize: 10,
             fontWeight: 700,
             letterSpacing: 4,
             textTransform: 'uppercase',
-            marginBottom: 6,
+            marginTop: 6,
           }}>
             Información del hotel
           </div>
-          <ClockDisplay />
         </div>
 
-        {/* Content */}
+        {/* Main content */}
         <div style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          padding: '32px',
-          gap: 20,
+          padding: '0 32px',
+          gap: 18,
         }}>
-          {/* Icon + label */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Icon + label row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
+              width: 48,
+              height: 48,
+              borderRadius: 14,
               background: '#c8102e',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 22,
+              fontSize: 24,
               flexShrink: 0,
             }}>
               {getLabelIcon(item.label)}
             </div>
             <div style={{
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: 12,
-              fontWeight: 700,
+              color: 'rgba(255,255,255,0.55)',
+              fontSize: 11,
+              fontWeight: 800,
               letterSpacing: 3,
               textTransform: 'uppercase',
+              lineHeight: 1.3,
             }}>
               {item.label}
             </div>
           </div>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: 'rgba(200,16,46,0.4)' }} />
+          {/* Red separator */}
+          <div style={{ height: 2, background: 'rgba(200,16,46,0.5)', borderRadius: 1 }} />
 
           {/* Value */}
           {isWifi ? (
@@ -174,8 +178,8 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
           ) : (
             <div style={{
               color: '#ffffff',
-              fontSize: item.value.length > 15 ? 42 : item.value.length > 8 ? 56 : 72,
-              fontWeight: 800,
+              fontSize: item.value.length > 15 ? 44 : item.value.length > 8 ? 58 : 76,
+              fontWeight: 900,
               lineHeight: 1.1,
               letterSpacing: -1,
             }}>
@@ -184,36 +188,38 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
           )}
         </div>
 
-        {/* Dots + progress */}
-        <div style={{ padding: '0 32px 24px', flexShrink: 0 }}>
+        {/* Bottom: dots + progress */}
+        <div style={{ padding: '20px 32px 0', flexShrink: 0 }}>
+          {/* Dots */}
           {total > 1 && (
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {items.map((_, i) => (
                 <div key={i} style={{
-                  height: 3,
-                  flex: i === currentIdx ? 2 : 1,
+                  height: 4,
+                  flex: i === currentIdx ? 3 : 1,
                   borderRadius: 2,
-                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.2)',
-                  transition: 'flex 0.3s ease, background 0.3s ease',
+                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.18)',
+                  transition: 'flex 0.35s ease',
                 }} />
               ))}
             </div>
           )}
-          <div style={{ height: 2, background: 'rgba(255,255,255,0.1)', borderRadius: 1, overflow: 'hidden' }}>
+          {/* Progress bar */}
+          <div style={{ height: 2, background: 'rgba(255,255,255,0.08)', borderRadius: 1, overflow: 'hidden', marginBottom: 0 }}>
             <div
-              key={`${currentIdx}-prog`}
+              key={`prog-${currentIdx}`}
               style={{
                 height: '100%',
                 background: '#c8102e',
-                transformOrigin: 'left',
+                width: '0%',
                 animation: `progress-bar ${slideDurationMs}ms linear forwards`,
               }}
             />
           </div>
         </div>
 
-        {/* Red bottom accent */}
-        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
+        {/* Red bottom stripe */}
+        <div style={{ height: 5, background: '#c8102e', flexShrink: 0, marginTop: 20 }} />
       </div>
     </div>
   );
@@ -221,22 +227,32 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
 
 function WifiBlock({ network, password }: { network: string; password: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
-        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Red</div>
-        <div style={{ color: '#fff', fontSize: network.length > 16 ? 24 : 32, fontWeight: 800 }}>{network}</div>
+        <div style={{
+          color: 'rgba(255,255,255,0.35)',
+          fontSize: 10, fontWeight: 800,
+          letterSpacing: 3, textTransform: 'uppercase', marginBottom: 5,
+        }}>Red</div>
+        <div style={{ color: '#fff', fontSize: network.length > 16 ? 26 : 34, fontWeight: 900 }}>
+          {network}
+        </div>
       </div>
       {password && (
         <div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Contraseña</div>
+          <div style={{
+            color: 'rgba(255,255,255,0.35)',
+            fontSize: 10, fontWeight: 800,
+            letterSpacing: 3, textTransform: 'uppercase', marginBottom: 5,
+          }}>Contraseña</div>
           <div style={{
             color: '#fff',
-            fontSize: password.length > 16 ? 20 : 26,
-            fontWeight: 700,
+            fontSize: password.length > 16 ? 20 : 28,
+            fontWeight: 800,
             fontFamily: 'monospace',
             letterSpacing: 2,
-            background: 'rgba(200,16,46,0.2)',
-            border: '1px solid rgba(200,16,46,0.4)',
+            background: 'rgba(200,16,46,0.25)',
+            border: '1px solid rgba(200,16,46,0.5)',
             borderRadius: 8,
             padding: '8px 14px',
             display: 'inline-block',
@@ -256,7 +272,7 @@ function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div style={{ color: '#fff', fontSize: 42, fontWeight: 800, letterSpacing: -1, lineHeight: 1 }}>
+    <div style={{ color: '#fff', fontSize: 52, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
       {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
     </div>
   );
