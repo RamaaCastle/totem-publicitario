@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface HotelInfoItem {
   id: string;
@@ -10,7 +10,6 @@ export interface HotelInfoItem {
 interface TVInfoScreenProps {
   items: HotelInfoItem[];
   slideDurationMs?: number;
-  /** Called once all items have been shown one full cycle */
   onComplete?: () => void;
 }
 
@@ -36,7 +35,6 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
       setTimeout(() => {
         const nextIdx = (currentIdx + 1) % total;
         if (nextIdx === 0) {
-          // Completed one full cycle
           onCompleteRef.current?.();
         } else {
           setCurrentIdx(nextIdx);
@@ -56,8 +54,8 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
   const isWifi = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
   const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
 
-  const slideOpacity = phase === 'show' ? 1 : 0;
-  const slideY = phase === 'in' ? '30px' : phase === 'out' ? '-30px' : '0px';
+  const panelOpacity = phase === 'show' ? 1 : 0;
+  const panelX = phase === 'in' ? '-40px' : phase === 'out' ? '-40px' : '0px';
 
   return (
     <div style={{
@@ -72,173 +70,176 @@ export function TVInfoScreen({ items, slideDurationMs = SLIDE_MS, onComplete }: 
           from { transform: scaleX(0); }
           to   { transform: scaleX(1); }
         }
-        @keyframes fade-bg {
-          from { opacity: 0; }
-          to   { opacity: 1; }
+        @keyframes bg-fade {
+          from { opacity: 0; transform: scale(1.04); }
+          to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
 
-      {/* Per-item background */}
+      {/* Full-screen background image */}
       {item.bgImageUrl ? (
-        <>
-          <div
-            key={item.bgImageUrl + currentIdx}
-            style={{
-              position: 'absolute', inset: 0,
-              backgroundImage: `url(${item.bgImageUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              animation: 'fade-bg 0.6s ease forwards',
-            }}
-          />
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(135deg, rgba(200,16,46,0.85) 0%, rgba(120,0,20,0.90) 100%)',
-          }} />
-        </>
-      ) : (
         <div
-          key={`solid-${currentIdx}`}
+          key={item.id + '-bg'}
           style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(135deg, #c8102e 0%, #8b0000 100%)',
-            animation: 'fade-bg 0.4s ease forwards',
+            backgroundImage: `url(${item.bgImageUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            animation: 'bg-fade 0.7s ease forwards',
           }}
         />
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, background: '#1a1a1a' }} />
       )}
 
-      {/* Texture overlay */}
+      {/* Left modal panel */}
       <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse at 20% 50%, rgba(255,255,255,0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Top white bar */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: '#fff', opacity: 0.9 }} />
-
-      {/* Header */}
-      <div style={{
-        position: 'absolute', top: 5, left: 0, right: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '18px 56px',
-        borderBottom: '1px solid rgba(255,255,255,0.2)',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: 420,
+        background: 'rgba(0,0,0,0.62)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        display: 'flex',
+        flexDirection: 'column',
+        transform: `translateX(${panelX})`,
+        opacity: panelOpacity,
+        transition: `transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1), opacity ${ANIM_MS}ms ease`,
       }}>
-        <span style={{
-          color: '#fff', fontSize: 13, fontWeight: 900,
-          letterSpacing: 6, textTransform: 'uppercase', opacity: 0.9,
-        }}>
-          Información del hotel
-        </span>
-        <ClockDisplay />
-      </div>
+        {/* Red top accent */}
+        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
 
-      {/* Main slide */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '100px 80px 90px',
-      }}>
+        {/* Header */}
         <div style={{
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 28,
-          transform: `translateY(${slideY})`,
-          opacity: slideOpacity,
-          transition: `transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1), opacity ${ANIM_MS}ms ease`,
-          width: '100%', textAlign: 'center', maxWidth: 900,
+          padding: '24px 32px 20px',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          flexShrink: 0,
         }}>
-          {/* Label chip */}
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 10,
-            background: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(4px)',
-            border: '2px solid rgba(255,255,255,0.35)',
-            color: '#fff', fontSize: 15, fontWeight: 900,
-            letterSpacing: 5, textTransform: 'uppercase',
-            padding: '10px 30px', borderRadius: 50,
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 4,
+            textTransform: 'uppercase',
+            marginBottom: 6,
           }}>
-            <span style={{ fontSize: 20 }}>{getLabelIcon(item.label)}</span>
-            {item.label}
+            Información del hotel
           </div>
+          <ClockDisplay />
+        </div>
+
+        {/* Content */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '32px',
+          gap: 20,
+        }}>
+          {/* Icon + label */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: '#c8102e',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 22,
+              flexShrink: 0,
+            }}>
+              {getLabelIcon(item.label)}
+            </div>
+            <div style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: 3,
+              textTransform: 'uppercase',
+            }}>
+              {item.label}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(200,16,46,0.4)' }} />
 
           {/* Value */}
           {isWifi ? (
-            <WifiSlide network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} />
+            <WifiBlock network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} />
           ) : (
             <div style={{
               color: '#ffffff',
-              fontSize: item.value.length > 20 ? 72 : item.value.length > 10 ? 96 : 128,
-              fontWeight: 900,
-              lineHeight: 1,
-              letterSpacing: -2,
-              textShadow: '0 4px 32px rgba(0,0,0,0.3)',
+              fontSize: item.value.length > 15 ? 42 : item.value.length > 8 ? 56 : 72,
+              fontWeight: 800,
+              lineHeight: 1.1,
+              letterSpacing: -1,
             }}>
               {item.value}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Bottom dots + progress */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 56px 20px' }}>
-        {total > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-            {items.map((_, i) => (
-              <div key={i} style={{
-                height: 8,
-                width: i === currentIdx ? 32 : 8,
-                borderRadius: 4,
-                background: i === currentIdx ? '#fff' : 'rgba(255,255,255,0.35)',
-                transition: 'width 0.3s ease, background 0.3s ease',
-              }} />
-            ))}
+        {/* Dots + progress */}
+        <div style={{ padding: '0 32px 24px', flexShrink: 0 }}>
+          {total > 1 && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {items.map((_, i) => (
+                <div key={i} style={{
+                  height: 3,
+                  flex: i === currentIdx ? 2 : 1,
+                  borderRadius: 2,
+                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.2)',
+                  transition: 'flex 0.3s ease, background 0.3s ease',
+                }} />
+              ))}
+            </div>
+          )}
+          <div style={{ height: 2, background: 'rgba(255,255,255,0.1)', borderRadius: 1, overflow: 'hidden' }}>
+            <div
+              key={`${currentIdx}-prog`}
+              style={{
+                height: '100%',
+                background: '#c8102e',
+                transformOrigin: 'left',
+                animation: `progress-bar ${slideDurationMs}ms linear forwards`,
+              }}
+            />
           </div>
-        )}
-        <div style={{ height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' }}>
-          <div
-            key={`${currentIdx}-prog`}
-            style={{
-              height: '100%', background: '#fff',
-              transformOrigin: 'left',
-              animation: `progress-bar ${slideDurationMs}ms linear forwards`,
-            }}
-          />
         </div>
-      </div>
 
-      {/* Bottom white bar */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 5, background: '#fff', opacity: 0.9 }} />
+        {/* Red bottom accent */}
+        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
+      </div>
     </div>
   );
 }
 
-function WifiSlide({ network, password }: { network: string; password: string }) {
+function WifiBlock({ network, password }: { network: string; password: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, marginTop: 8 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 8 }}>
-          Red
-        </div>
-        <div style={{ color: '#fff', fontSize: network.length > 16 ? 48 : 64, fontWeight: 900, letterSpacing: -1 }}>
-          {network}
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Red</div>
+        <div style={{ color: '#fff', fontSize: network.length > 16 ? 24 : 32, fontWeight: 800 }}>{network}</div>
       </div>
       {password && (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 8 }}>
-            Contraseña
-          </div>
+        <div>
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Contraseña</div>
           <div style={{
             color: '#fff',
-            fontSize: password.length > 16 ? 36 : 52,
+            fontSize: password.length > 16 ? 20 : 26,
             fontWeight: 700,
             fontFamily: 'monospace',
-            letterSpacing: 4,
-            background: 'rgba(255,255,255,0.15)',
-            border: '2px solid rgba(255,255,255,0.3)',
-            borderRadius: 12,
-            padding: '10px 32px',
+            letterSpacing: 2,
+            background: 'rgba(200,16,46,0.2)',
+            border: '1px solid rgba(200,16,46,0.4)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            display: 'inline-block',
           }}>
             {password}
           </div>
@@ -255,9 +256,9 @@ function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <span style={{ color: '#fff', fontSize: 36, fontWeight: 900, letterSpacing: 3, opacity: 0.9 }}>
+    <div style={{ color: '#fff', fontSize: 42, fontWeight: 800, letterSpacing: -1, lineHeight: 1 }}>
       {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-    </span>
+    </div>
   );
 }
 
