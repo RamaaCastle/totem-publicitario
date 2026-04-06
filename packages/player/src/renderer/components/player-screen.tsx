@@ -14,9 +14,9 @@ export function PlayerScreen() {
   const {
     deviceCode, deviceToken, apiUrl, wsUrl,
     playlist, currentIndex, isOnline, orientation,
-    screenType, schedule, hotelInfo,
+    screenType, schedule, hotelInfo, hotelLogo,
     setPlaylist, setCurrentIndex, setIsOnline, setOrientation, nextItem,
-    setScreenType, setSchedule, setHotelInfo,
+    setScreenType, setSchedule, setHotelInfo, setHotelLogo,
   } = usePlayerStore();
 
   const socketRef = useRef<Socket | null>(null);
@@ -56,6 +56,7 @@ export function PlayerScreen() {
       if (data.data?.screen?.screenType) setScreenType(data.data.screen.screenType);
       if (data.data?.screen?.schedule !== undefined) setSchedule(data.data.screen.schedule);
       if (data.data?.screen?.hotelInfo !== undefined) setHotelInfo(data.data.screen.hotelInfo ?? null);
+      if (data.data?.screen?.hotelLogo !== undefined) setHotelLogo(data.data.screen.hotelLogo ?? null);
     } catch {
       // Offline — continue with cached content
     }
@@ -197,6 +198,7 @@ export function PlayerScreen() {
         <TVInfoScreen
           key={infoCycle}
           items={hotelInfo!}
+          logoUrl={hotelLogo ?? undefined}
           onComplete={handleTVInfoComplete}
         />
       );

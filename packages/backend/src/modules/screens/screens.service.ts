@@ -99,9 +99,13 @@ export class ScreensService {
     return this.screenRepo.save(screen);
   }
 
-  async updateHotelInfo(id: string, hotelInfo: any[], organizationId: string): Promise<Screen> {
+  async updateHotelInfo(id: string, hotelInfo: any[], organizationId: string, hotelLogo?: string | null): Promise<Screen> {
     const screen = await this.findOne(id, organizationId);
-    screen.metadata = { ...(screen.metadata ?? {}), hotelInfo };
+    screen.metadata = {
+      ...(screen.metadata ?? {}),
+      hotelInfo,
+      hotelLogo: hotelLogo !== undefined ? hotelLogo : (screen.metadata?.hotelLogo ?? null),
+    };
     return this.screenRepo.save(screen);
   }
 

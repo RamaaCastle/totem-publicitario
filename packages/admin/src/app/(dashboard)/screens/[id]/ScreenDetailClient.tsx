@@ -75,8 +75,11 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const [hotelInfo, setHotelInfo] = useState<HotelInfoItem[]>([]);
   const [hotelInfoLoaded, setHotelInfoLoaded] = useState(false);
   const [hotelInfoSaved, setHotelInfoSaved] = useState(false);
+  const [hotelLogo, setHotelLogo] = useState<string>('');
+  const [uploadingHotelLogo, setUploadingHotelLogo] = useState(false);
   const [uploadingHotelItemId, setUploadingHotelItemId] = useState<string | null>(null);
   const hotelBgRef = useRef<HTMLInputElement>(null);
+  const hotelLogoRef = useRef<HTMLInputElement>(null);
   const hotelBgTargetId = useRef<string | null>(null);
 
   // ── Activity catalog state ─────────────────────────────────────────────────
@@ -142,6 +145,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   useEffect(() => {
     if (screen && !hotelInfoLoaded) {
       setHotelInfo(screen.metadata?.hotelInfo ?? []);
+      setHotelLogo(screen.metadata?.hotelLogo ?? '');
       setHotelInfoLoaded(true);
     }
   }, [screen, hotelInfoLoaded]);
@@ -361,8 +365,25 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     }
   };
 
+  const handleHotelLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingHotelLogo(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('upload_preset', 'Pedraza');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
+      const json = await res.json();
+      if (json?.secure_url) setHotelLogo(json.secure_url);
+    } catch { /* silent */ } finally {
+      setUploadingHotelLogo(false);
+      if (hotelLogoRef.current) hotelLogoRef.current.value = '';
+    }
+  };
+
   const saveHotelInfoMutation = useMutation({
-    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo }),
+    mutationFn: () => apiClient.put(`/api/v1/screens/${id}/hotel-info`, { hotelInfo, hotelLogo: hotelLogo || null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['screen', id] });
       setHotelInfoSaved(true);
@@ -934,8 +955,34 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
           </div>
 
           <div className="p-4 space-y-2">
-            {/* Hidden file input for per-item bg upload */}
+            {/* Hidden file inputs */}
+            <input ref={hotelLogoRef} type="file" accept="image/*" className="hidden" onChange={handleHotelLogoUpload} />
             <input ref={hotelBgRef} type="file" accept="image/*" className="hidden" onChange={handleHotelBgUpload} />
+
+            {/* Logo upload */}
+            <div className="flex items-center gap-4 pb-4 mb-2 border-b border-slate-100 dark:border-slate-700">
+              <button
+                onClick={() => hotelLogoRef.current?.click()}
+                disabled={uploadingHotelLogo}
+                className="w-28 h-16 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-amber-400 bg-slate-50 dark:bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 transition"
+              >
+                {uploadingHotelLogo ? (
+                  <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                ) : hotelLogo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hotelLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                ) : (
+                  <span className="text-xs text-slate-400 text-center leading-tight px-2">Logo del hotel</span>
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Logo del hotel</p>
+                <p className="text-xs text-slate-400 mt-0.5">Se muestra en la parte superior del panel de TV</p>
+                {hotelLogo && (
+                  <button onClick={() => setHotelLogo('')} className="text-xs text-red-500 hover:underline mt-1">Quitar logo</button>
+                )}
+              </div>
+            </div>
 
             {hotelInfo.length === 0 && (
               <p className="text-slate-400 text-sm py-2 text-center">

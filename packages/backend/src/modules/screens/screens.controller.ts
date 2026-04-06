@@ -107,9 +107,10 @@ export class ScreensController {
   async updateHotelInfo(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('hotelInfo') hotelInfo: any[],
+    @Body('hotelLogo') hotelLogo: string | undefined,
     @CurrentUser() user: User,
   ) {
-    const screen = await this.screensService.updateHotelInfo(id, hotelInfo ?? [], user.organizationId);
+    const screen = await this.screensService.updateHotelInfo(id, hotelInfo ?? [], user.organizationId, hotelLogo ?? null);
     await this.screensGateway.pushPlaylistUpdate(screen.id, screen.organizationId).catch(() => {});
     return screen;
   }
