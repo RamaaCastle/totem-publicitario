@@ -112,10 +112,8 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
               alt="Logo"
               style={{
                 maxWidth: '100%',
-                maxHeight: 80,
+                maxHeight: 90,
                 objectFit: 'contain',
-                filter: 'brightness(0) invert(1)',
-                opacity: 0.9,
               }}
             />
           ) : (
@@ -166,17 +164,17 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
         }}>
           {/* Label */}
           <div style={{
-            color: 'rgba(255,255,255,0.45)',
-            fontSize: 11,
+            color: 'rgba(255,255,255,0.75)',
+            fontSize: 22,
             fontWeight: 700,
-            letterSpacing: 4,
+            letterSpacing: 2,
             textTransform: 'uppercase',
           }}>
             {item.label}
           </div>
 
           {/* Red accent line */}
-          <div style={{ width: 40, height: 3, background: '#c8102e', borderRadius: 2 }} />
+          <div style={{ width: 48, height: 3, background: '#c8102e', borderRadius: 2 }} />
 
           {/* Value */}
           {isWifi ? (
