@@ -20,10 +20,24 @@ const ANIM_MS = 400;
 export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onComplete }: TVInfoScreenProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [visible, setVisible] = useState(false);
+  // Bumped when app returns to foreground — forces slide timer to restart cleanly
+  const [resumeKey, setResumeKey] = useState(0);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
   const total = items.length;
+
+  // Restart slide when app comes back from background
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setVisible(false);
+        setResumeKey((k) => k + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   useEffect(() => {
     if (total === 0) return;
@@ -43,7 +57,7 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
       clearTimeout(showTimer);
       clearTimeout(slideTimer);
     };
-  }, [currentIdx, total, slideDurationMs]);
+  }, [currentIdx, resumeKey, total, slideDurationMs]);
 
   if (total === 0) return null;
 
