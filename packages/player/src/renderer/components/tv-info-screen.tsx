@@ -15,241 +15,345 @@ interface TVInfoScreenProps {
 }
 
 const SLIDE_MS = 5000;
-const ANIM_MS = 400;
-const TICK_MS = 250; // interval tick — survives background throttling
+const ANIM_MS  = 380;
+const TICK_MS  = 200;
 
+// ── Time helpers ──────────────────────────────────────────────────────────────
+function nowMinutes(): number {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function parseTimeRange(value: string): { start: number; end: number } | null {
+  const m = value.match(/(\d{1,2})(?::(\d{2}))?\s*(?:a|-|hasta)\s*(\d{1,2})(?::(\d{2}))?/i);
+  if (!m) return null;
+  return {
+    start: parseInt(m[1]) * 60 + parseInt(m[2] ?? '0'),
+    end:   parseInt(m[3]) * 60 + parseInt(m[4] ?? '0'),
+  };
+}
+
+function parseExactTime(value: string): number | null {
+  const m = value.match(/^(\d{1,2}):(\d{2})(?:\s*h)?$/i);
+  if (!m) return null;
+  return parseInt(m[1]) * 60 + parseInt(m[2]);
+}
+
+function formatDiff(diffMin: number): string {
+  if (diffMin < 60) return `${diffMin} min`;
+  const h = Math.floor(diffMin / 60);
+  const m = diffMin % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
+type TimeStatus = { type: 'active' | 'soon' | 'exact'; label: string } | null;
+
+function getTimeStatus(value: string): TimeStatus {
+  const now = nowMinutes();
+  const range = parseTimeRange(value);
+  if (range) {
+    if (now >= range.start && now <= range.end) return { type: 'active', label: 'En curso' };
+    if (now < range.start) {
+      const diff = range.start - now;
+      if (diff <= 180) return { type: 'soon', label: `En ${formatDiff(diff)}` };
+    }
+    return null;
+  }
+  const exact = parseExactTime(value);
+  if (exact !== null) {
+    const diff = exact - now;
+    if (diff > 0 && diff <= 60) return { type: 'soon', label: `En ${formatDiff(diff)}` };
+    if (diff === 0) return { type: 'active', label: 'Ahora' };
+  }
+  return null;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onComplete }: TVInfoScreenProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [visible, setVisible] = useState(false);
-  const [logoError, setLogoError] = useState(false);
+  const [phase, setPhase]           = useState<'enter' | 'idle' | 'exit'>('enter');
+  const [logoError, setLogoError]   = useState(false);
+  const [, setTick]                  = useState(0); // forces re-calc of status each minute
 
-  const onCompleteRef   = useRef(onComplete);
-  const slideStartRef   = useRef(Date.now());
-  const advancingRef    = useRef(false);
-  const currentIdxRef   = useRef(0);
-
-  onCompleteRef.current = onComplete;
-  currentIdxRef.current = currentIdx;
+  const onCompleteRef  = useRef(onComplete);
+  const slideStartRef  = useRef(Date.now());
+  const advancingRef   = useRef(false);
+  const currentIdxRef  = useRef(0);
+  onCompleteRef.current  = onComplete;
+  currentIdxRef.current  = currentIdx;
 
   const total = items.length;
 
-  // Reset slide timer + show animation whenever index changes
+  // Clock tick for status badge
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 15000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Reset on slide change
   useEffect(() => {
     if (total === 0) return;
     advancingRef.current  = false;
     slideStartRef.current = Date.now();
-    setVisible(false);
-    const t = setTimeout(() => setVisible(true), 40);
+    setPhase('enter');
+    const t = setTimeout(() => setPhase('idle'), ANIM_MS);
     return () => clearTimeout(t);
   }, [currentIdx, total]);
 
-  // Main tick: check elapsed time — works even after background throttling
+  // Advance logic (interval-based — survives Android background throttling)
   useEffect(() => {
     if (total === 0) return;
 
     const advance = () => {
       if (advancingRef.current) return;
       advancingRef.current = true;
-      setVisible(false);
+      const next = (currentIdxRef.current + 1) % total;
 
-      setTimeout(() => {
-        const next = (currentIdxRef.current + 1) % total;
-        if (next === 0) {
-          onCompleteRef.current?.();
-          // onComplete will unmount/re-key this component — no index change needed
-        } else {
-          setCurrentIdx(next);
-        }
-      }, ANIM_MS);
+      if (next === 0) {
+        // Last item done — notify parent immediately (no fade so no frozen bg)
+        onCompleteRef.current?.();
+      } else {
+        setPhase('exit');
+        setTimeout(() => setCurrentIdx(next), ANIM_MS);
+      }
     };
 
     const interval = setInterval(() => {
       if (advancingRef.current) return;
-      const elapsed = Date.now() - slideStartRef.current;
-      if (elapsed >= slideDurationMs) advance();
+      if (Date.now() - slideStartRef.current >= slideDurationMs) advance();
     }, TICK_MS);
 
-    // Also re-sync when app returns to foreground
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && !advancingRef.current) {
-        const elapsed = Date.now() - slideStartRef.current;
-        if (elapsed >= slideDurationMs) {
-          advance();
-        } else {
-          // Just re-trigger the show animation in case it was interrupted
-          setVisible(false);
-          setTimeout(() => setVisible(true), 40);
-        }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || advancingRef.current) return;
+      if (Date.now() - slideStartRef.current >= slideDurationMs) {
+        advance();
+      } else {
+        setPhase('enter');
+        setTimeout(() => setPhase('idle'), ANIM_MS);
       }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('visibilitychange', onVisible);
 
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
   }, [total, slideDurationMs]);
 
-  // Reset logo error when URL changes
   useEffect(() => { setLogoError(false); }, [logoUrl]);
 
   if (total === 0) return null;
 
-  const item    = items[currentIdx];
-  const isWifi  = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
+  const item      = items[currentIdx];
+  const isWifi    = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
   const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
-  const showLogo = !!logoUrl && !logoError;
+  const status    = isWifi ? null : getTimeStatus(item.value);
+  const showLogo  = !!logoUrl && !logoError;
+
+  const panelX = phase === 'enter' ? '-32px' : phase === 'exit' ? '-32px' : '0px';
+  const panelO = phase === 'idle' ? 1 : 0;
+
+  const valueLen = item.value.length;
+  const valueFontSize = valueLen > 22 ? 36 : valueLen > 14 ? 48 : valueLen > 8 ? 62 : 78;
 
   return (
     <div style={{
       width: '100vw', height: '100vh',
       position: 'relative', overflow: 'hidden',
       fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
-      background: '#111',
+      background: '#0d0d0d',
     }}>
       <style>{`
-        @keyframes tv-progress {
-          from { width: 0%; }
-          to   { width: 100%; }
-        }
-        @keyframes tv-bg-in {
-          from { opacity: 0; transform: scale(1.04); }
-          to   { opacity: 1; transform: scale(1); }
-        }
+        @keyframes tv-prog { from{width:0%} to{width:100%} }
+        @keyframes tv-bg   { from{opacity:0;transform:scale(1.05)} to{opacity:1;transform:scale(1)} }
+        @keyframes tv-pulse{ 0%,100%{opacity:1} 50%{opacity:.6} }
       `}</style>
 
-      {/* Fullscreen background */}
+      {/* Background */}
       <div
         key={item.id + '-bg'}
         style={{
           position: 'absolute', inset: 0,
           backgroundImage: item.bgImageUrl ? `url(${item.bgImageUrl})` : 'none',
-          backgroundColor: item.bgImageUrl ? 'transparent' : '#1a1a1a',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          animation: 'tv-bg-in 0.8s ease forwards',
+          backgroundColor: item.bgImageUrl ? 'transparent' : '#181818',
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          animation: 'tv-bg 0.9s ease forwards',
         }}
       />
-
-      {/* Left panel */}
+      {/* Right-side vignette to keep bg visible but not competing */}
       <div style={{
-        position: 'absolute',
-        top: 0, left: 0, bottom: 0,
-        width: 480,
-        background: 'rgba(0,0,0,0.65)',
-        display: 'flex',
-        flexDirection: 'column',
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateX(0)' : 'translateX(-24px)',
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 55%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── LEFT PANEL ── */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, bottom: 0,
+        width: 520,
+        background: 'rgba(0,0,0,0.72)',
+        display: 'flex', flexDirection: 'column',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+        opacity: panelO,
+        transform: `translateX(${panelX})`,
         transition: `opacity ${ANIM_MS}ms ease, transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1)`,
       }}>
+
+        {/* Red top stripe */}
+        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
 
         {/* Logo */}
         {showLogo && (
           <div style={{
-            padding: '24px 36px 20px',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-            flexShrink: 0,
+            padding: '22px 32px 18px', flexShrink: 0,
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <div style={{
-              background: '#fff', borderRadius: 10,
-              padding: '10px 20px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <img
-                src={logoUrl}
-                alt=""
-                onError={() => setLogoError(true)}
-                style={{ maxWidth: 260, maxHeight: 70, objectFit: 'contain', display: 'block' }}
-              />
-            </div>
+            <img
+              src={logoUrl}
+              alt=""
+              onError={() => setLogoError(true)}
+              style={{
+                maxWidth: 220, maxHeight: 64,
+                objectFit: 'contain', display: 'block',
+                filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.8))',
+              }}
+            />
           </div>
         )}
 
-        {/* Clock + subtitle */}
-        <div style={{ padding: showLogo ? '20px 36px 0' : '32px 36px 0', flexShrink: 0 }}>
+        {/* Clock */}
+        <div style={{
+          padding: showLogo ? '16px 32px 0' : '28px 32px 0',
+          flexShrink: 0,
+        }}>
           <ClockDisplay />
           <div style={{
-            color: 'rgba(255,255,255,0.3)', fontSize: 10,
-            fontWeight: 700, letterSpacing: 5, textTransform: 'uppercase', marginTop: 6,
+            color: 'rgba(255,255,255,0.28)', fontSize: 9,
+            fontWeight: 800, letterSpacing: 5, textTransform: 'uppercase', marginTop: 4,
           }}>
             Información del hotel
           </div>
         </div>
 
-        {/* Divider */}
-        <div style={{ margin: '22px 36px 0', height: 1, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
+        {/* Separator */}
+        <div style={{ margin: '18px 32px 0', height: 1, background: 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
 
-        {/* Content */}
+        {/* ── Content ── */}
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          justifyContent: 'center', padding: '0 36px', gap: 14,
+          justifyContent: 'center', padding: '0 32px', gap: 12,
         }}>
+
+          {/* Label */}
           <div style={{
-            color: 'rgba(255,255,255,0.75)', fontSize: 22,
-            fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.75)',
+            fontSize: 26, fontWeight: 800,
+            letterSpacing: 2, textTransform: 'uppercase',
           }}>
             {item.label}
           </div>
 
-          <div style={{ width: 48, height: 3, background: '#c8102e', borderRadius: 2 }} />
+          {/* Red accent */}
+          <div style={{ width: 36, height: 3, background: '#c8102e', borderRadius: 2 }} />
 
+          {/* Value */}
           {isWifi ? (
             <WifiBlock network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} />
           ) : (
             <div style={{
-              color: '#ffffff',
-              fontSize: item.value.length > 18 ? 40 : item.value.length > 10 ? 56 : 74,
-              fontWeight: 800, lineHeight: 1.1, letterSpacing: -1,
+              color: '#fff',
+              fontSize: valueFontSize,
+              fontWeight: 900, lineHeight: 1.05, letterSpacing: -1,
             }}>
               {item.value}
+            </div>
+          )}
+
+          {/* Status badge */}
+          {status && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: status.type === 'active'
+                ? 'rgba(34,197,94,0.18)'
+                : 'rgba(251,191,36,0.18)',
+              border: `1px solid ${status.type === 'active' ? 'rgba(34,197,94,0.5)' : 'rgba(251,191,36,0.5)'}`,
+              borderRadius: 50, padding: '6px 16px',
+              alignSelf: 'flex-start', marginTop: 4,
+            }}>
+              {/* Pulsing dot */}
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: status.type === 'active' ? '#22c55e' : '#fbbf24',
+                animation: status.type === 'active' ? 'tv-pulse 1.5s ease infinite' : 'none',
+              }} />
+              <span style={{
+                color: status.type === 'active' ? '#4ade80' : '#fde68a',
+                fontSize: 14, fontWeight: 800, letterSpacing: 0.5,
+              }}>
+                {status.label}
+              </span>
             </div>
           )}
         </div>
 
         {/* Dots + progress */}
-        <div style={{ padding: '0 36px 32px', flexShrink: 0 }}>
+        <div style={{ padding: '0 32px 28px', flexShrink: 0 }}>
           {total > 1 && (
             <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
               {items.map((_, i) => (
                 <div key={i} style={{
-                  height: 3, flex: i === currentIdx ? 3 : 1, borderRadius: 2,
-                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.15)',
-                  transition: 'flex 0.35s ease',
+                  height: 3,
+                  flex: i === currentIdx ? 3 : 1,
+                  borderRadius: 2,
+                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.13)',
+                  transition: 'flex 0.4s ease',
                 }} />
               ))}
             </div>
           )}
-          <div style={{ height: 2, background: 'rgba(255,255,255,0.07)', borderRadius: 1, overflow: 'hidden' }}>
+          <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, overflow: 'hidden' }}>
             <div
               key={`prog-${currentIdx}`}
               style={{
                 height: '100%', background: '#c8102e', width: '0%',
-                animation: `tv-progress ${slideDurationMs}ms linear forwards`,
+                animation: `tv-prog ${slideDurationMs}ms linear forwards`,
               }}
             />
           </div>
         </div>
+
+        {/* Red bottom stripe */}
+        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
       </div>
+
+      {/* Slide counter top-right */}
+      {total > 1 && (
+        <div style={{
+          position: 'absolute', top: 20, right: 24,
+          color: 'rgba(255,255,255,0.35)', fontSize: 12,
+          fontWeight: 700, letterSpacing: 2,
+        }}>
+          {currentIdx + 1} / {total}
+        </div>
+      )}
     </div>
   );
 }
 
 function WifiBlock({ network, password }: { network: string; password: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
-        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
-        <div style={{ color: '#fff', fontSize: network.length > 18 ? 24 : 32, fontWeight: 800 }}>{network}</div>
+        <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
+        <div style={{ color: '#fff', fontSize: network.length > 18 ? 26 : 36, fontWeight: 900 }}>{network}</div>
       </div>
       {password && (
         <div>
-          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
+          <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
           <div style={{
-            color: '#fff', fontSize: password.length > 18 ? 18 : 26, fontWeight: 700,
-            fontFamily: 'monospace', letterSpacing: 2,
-            background: 'rgba(200,16,46,0.2)', border: '1px solid rgba(200,16,46,0.45)',
+            color: '#fff',
+            fontSize: password.length > 18 ? 18 : 28,
+            fontWeight: 800, fontFamily: 'monospace', letterSpacing: 3,
+            background: 'rgba(200,16,46,0.18)',
+            border: '1px solid rgba(200,16,46,0.4)',
             borderRadius: 8, padding: '10px 16px', display: 'inline-block',
           }}>
             {password}
@@ -267,7 +371,7 @@ function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div style={{ color: '#fff', fontSize: 58, fontWeight: 800, letterSpacing: -2, lineHeight: 1 }}>
+    <div style={{ color: '#fff', fontSize: 54, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
       {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
     </div>
   );
