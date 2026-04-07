@@ -98,56 +98,55 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
       }}>
 
         {/* Logo area */}
-        <div style={{
-          padding: logoUrl ? '28px 36px 24px' : '28px 36px 0',
-          borderBottom: logoUrl ? '1px solid rgba(255,255,255,0.07)' : 'none',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="Logo"
-              style={{
-                maxWidth: '100%',
-                maxHeight: 90,
-                objectFit: 'contain',
-              }}
-            />
-          ) : (
+        {logoUrl && (
+          <div style={{
+            padding: '24px 36px 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {/* White bg so transparent PNGs are always visible */}
             <div style={{
-              color: 'rgba(255,255,255,0.25)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: 5,
-              textTransform: 'uppercase',
-              paddingBottom: 0,
+              background: '#ffffff',
+              borderRadius: 10,
+              padding: '10px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              maxWidth: '100%',
             }}>
-              Información del hotel
+              <img
+                src={logoUrl}
+                alt="Logo"
+                style={{
+                  maxWidth: 260,
+                  maxHeight: 70,
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Clock */}
+        {/* Clock + subtitle */}
         <div style={{
-          padding: logoUrl ? '20px 36px 0' : '28px 36px 0',
+          padding: logoUrl ? '20px 36px 0' : '32px 36px 0',
           flexShrink: 0,
         }}>
           <ClockDisplay />
-          {logoUrl && (
-            <div style={{
-              color: 'rgba(255,255,255,0.3)',
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: 5,
-              textTransform: 'uppercase',
-              marginTop: 6,
-            }}>
-              Información del hotel
-            </div>
-          )}
+          <div style={{
+            color: 'rgba(255,255,255,0.3)',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 5,
+            textTransform: 'uppercase',
+            marginTop: 6,
+          }}>
+            Información del hotel
+          </div>
         </div>
 
         {/* Divider */}
