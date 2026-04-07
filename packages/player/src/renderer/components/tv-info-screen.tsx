@@ -16,61 +16,94 @@ interface TVInfoScreenProps {
 
 const SLIDE_MS = 5000;
 const ANIM_MS = 400;
+const TICK_MS = 250; // interval tick — survives background throttling
 
 export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onComplete }: TVInfoScreenProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [visible, setVisible] = useState(false);
-  // Bumped when app returns to foreground — forces slide timer to restart cleanly
-  const [resumeKey, setResumeKey] = useState(0);
-  const onCompleteRef = useRef(onComplete);
+  const [logoError, setLogoError] = useState(false);
+
+  const onCompleteRef   = useRef(onComplete);
+  const slideStartRef   = useRef(Date.now());
+  const advancingRef    = useRef(false);
+  const currentIdxRef   = useRef(0);
+
   onCompleteRef.current = onComplete;
+  currentIdxRef.current = currentIdx;
 
   const total = items.length;
 
-  // Restart slide when app comes back from background
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        setVisible(false);
-        setResumeKey((k) => k + 1);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
-
+  // Reset slide timer + show animation whenever index changes
   useEffect(() => {
     if (total === 0) return;
-    const showTimer = setTimeout(() => setVisible(true), 40);
-    const slideTimer = setTimeout(() => {
+    advancingRef.current  = false;
+    slideStartRef.current = Date.now();
+    setVisible(false);
+    const t = setTimeout(() => setVisible(true), 40);
+    return () => clearTimeout(t);
+  }, [currentIdx, total]);
+
+  // Main tick: check elapsed time — works even after background throttling
+  useEffect(() => {
+    if (total === 0) return;
+
+    const advance = () => {
+      if (advancingRef.current) return;
+      advancingRef.current = true;
       setVisible(false);
+
       setTimeout(() => {
-        const next = (currentIdx + 1) % total;
+        const next = (currentIdxRef.current + 1) % total;
         if (next === 0) {
           onCompleteRef.current?.();
+          // onComplete will unmount/re-key this component — no index change needed
         } else {
           setCurrentIdx(next);
         }
       }, ANIM_MS);
-    }, slideDurationMs);
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(slideTimer);
     };
-  }, [currentIdx, resumeKey, total, slideDurationMs]);
+
+    const interval = setInterval(() => {
+      if (advancingRef.current) return;
+      const elapsed = Date.now() - slideStartRef.current;
+      if (elapsed >= slideDurationMs) advance();
+    }, TICK_MS);
+
+    // Also re-sync when app returns to foreground
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !advancingRef.current) {
+        const elapsed = Date.now() - slideStartRef.current;
+        if (elapsed >= slideDurationMs) {
+          advance();
+        } else {
+          // Just re-trigger the show animation in case it was interrupted
+          setVisible(false);
+          setTimeout(() => setVisible(true), 40);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [total, slideDurationMs]);
+
+  // Reset logo error when URL changes
+  useEffect(() => { setLogoError(false); }, [logoUrl]);
 
   if (total === 0) return null;
 
-  const item = items[currentIdx];
-  const isWifi = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
+  const item    = items[currentIdx];
+  const isWifi  = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
   const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
+  const showLogo = !!logoUrl && !logoError;
 
   return (
     <div style={{
-      width: '100vw',
-      height: '100vh',
-      position: 'relative',
-      overflow: 'hidden',
+      width: '100vw', height: '100vh',
+      position: 'relative', overflow: 'hidden',
       fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
       background: '#111',
     }}>
@@ -111,53 +144,35 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
         transition: `opacity ${ANIM_MS}ms ease, transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1)`,
       }}>
 
-        {/* Logo area */}
-        {logoUrl && (
+        {/* Logo */}
+        {showLogo && (
           <div style={{
             padding: '24px 36px 20px',
             borderBottom: '1px solid rgba(255,255,255,0.07)',
             flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {/* White bg so transparent PNGs are always visible */}
             <div style={{
-              background: '#ffffff',
-              borderRadius: 10,
+              background: '#fff', borderRadius: 10,
               padding: '10px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              maxWidth: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <img
                 src={logoUrl}
-                alt="Logo"
-                style={{
-                  maxWidth: 260,
-                  maxHeight: 70,
-                  objectFit: 'contain',
-                  display: 'block',
-                }}
+                alt=""
+                onError={() => setLogoError(true)}
+                style={{ maxWidth: 260, maxHeight: 70, objectFit: 'contain', display: 'block' }}
               />
             </div>
           </div>
         )}
 
         {/* Clock + subtitle */}
-        <div style={{
-          padding: logoUrl ? '20px 36px 0' : '32px 36px 0',
-          flexShrink: 0,
-        }}>
+        <div style={{ padding: showLogo ? '20px 36px 0' : '32px 36px 0', flexShrink: 0 }}>
           <ClockDisplay />
           <div style={{
-            color: 'rgba(255,255,255,0.3)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: 5,
-            textTransform: 'uppercase',
-            marginTop: 6,
+            color: 'rgba(255,255,255,0.3)', fontSize: 10,
+            fontWeight: 700, letterSpacing: 5, textTransform: 'uppercase', marginTop: 6,
           }}>
             Información del hotel
           </div>
@@ -168,52 +183,38 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
 
         {/* Content */}
         <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '0 36px',
-          gap: 14,
+          flex: 1, display: 'flex', flexDirection: 'column',
+          justifyContent: 'center', padding: '0 36px', gap: 14,
         }}>
-          {/* Label */}
           <div style={{
-            color: 'rgba(255,255,255,0.75)',
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: 2,
-            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.75)', fontSize: 22,
+            fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase',
           }}>
             {item.label}
           </div>
 
-          {/* Red accent line */}
           <div style={{ width: 48, height: 3, background: '#c8102e', borderRadius: 2 }} />
 
-          {/* Value */}
           {isWifi ? (
             <WifiBlock network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} />
           ) : (
             <div style={{
               color: '#ffffff',
               fontSize: item.value.length > 18 ? 40 : item.value.length > 10 ? 56 : 74,
-              fontWeight: 800,
-              lineHeight: 1.1,
-              letterSpacing: -1,
+              fontWeight: 800, lineHeight: 1.1, letterSpacing: -1,
             }}>
               {item.value}
             </div>
           )}
         </div>
 
-        {/* Progress dots + bar */}
+        {/* Dots + progress */}
         <div style={{ padding: '0 36px 32px', flexShrink: 0 }}>
           {total > 1 && (
             <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
               {items.map((_, i) => (
                 <div key={i} style={{
-                  height: 3,
-                  flex: i === currentIdx ? 3 : 1,
-                  borderRadius: 2,
+                  height: 3, flex: i === currentIdx ? 3 : 1, borderRadius: 2,
                   background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.15)',
                   transition: 'flex 0.35s ease',
                 }} />
@@ -224,9 +225,7 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
             <div
               key={`prog-${currentIdx}`}
               style={{
-                height: '100%',
-                background: '#c8102e',
-                width: '0%',
+                height: '100%', background: '#c8102e', width: '0%',
                 animation: `tv-progress ${slideDurationMs}ms linear forwards`,
               }}
             />
@@ -241,33 +240,17 @@ function WifiBlock({ network, password }: { network: string; password: string })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <div style={{
-          color: 'rgba(255,255,255,0.3)',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6,
-        }}>Red</div>
-        <div style={{ color: '#fff', fontSize: network.length > 18 ? 24 : 32, fontWeight: 800 }}>
-          {network}
-        </div>
+        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
+        <div style={{ color: '#fff', fontSize: network.length > 18 ? 24 : 32, fontWeight: 800 }}>{network}</div>
       </div>
       {password && (
         <div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
           <div style={{
-            color: 'rgba(255,255,255,0.3)',
-            fontSize: 10, fontWeight: 700,
-            letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6,
-          }}>Contraseña</div>
-          <div style={{
-            color: '#fff',
-            fontSize: password.length > 18 ? 18 : 26,
-            fontWeight: 700,
-            fontFamily: 'monospace',
-            letterSpacing: 2,
-            background: 'rgba(200,16,46,0.2)',
-            border: '1px solid rgba(200,16,46,0.45)',
-            borderRadius: 8,
-            padding: '10px 16px',
-            display: 'inline-block',
+            color: '#fff', fontSize: password.length > 18 ? 18 : 26, fontWeight: 700,
+            fontFamily: 'monospace', letterSpacing: 2,
+            background: 'rgba(200,16,46,0.2)', border: '1px solid rgba(200,16,46,0.45)',
+            borderRadius: 8, padding: '10px 16px', display: 'inline-block',
           }}>
             {password}
           </div>
