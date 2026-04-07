@@ -151,7 +151,7 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
   const panelO = phase === 'idle' ? 1 : 0;
 
   const valueLen = item.value.length;
-  const valueFontSize = valueLen > 22 ? 36 : valueLen > 14 ? 48 : valueLen > 8 ? 62 : 78;
+  const valueFontSize = valueLen > 22 ? 52 : valueLen > 14 ? 68 : valueLen > 8 ? 86 : 104;
 
   return (
     <div style={{
@@ -187,7 +187,7 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
       {/* ── LEFT PANEL ── */}
       <div style={{
         position: 'absolute', top: 0, left: 0, bottom: 0,
-        width: 520,
+        width: 600,
         background: 'rgba(0,0,0,0.72)',
         display: 'flex', flexDirection: 'column',
         borderRight: '1px solid rgba(255,255,255,0.06)',
@@ -244,8 +244,8 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
 
           {/* Label */}
           <div style={{
-            color: 'rgba(255,255,255,0.75)',
-            fontSize: 26, fontWeight: 800,
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: 36, fontWeight: 800,
             letterSpacing: 2, textTransform: 'uppercase',
           }}>
             {item.label}
@@ -286,7 +286,7 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
               }} />
               <span style={{
                 color: status.type === 'active' ? '#4ade80' : '#fde68a',
-                fontSize: 14, fontWeight: 800, letterSpacing: 0.5,
+                fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
               }}>
                 {status.label}
               </span>
@@ -343,14 +343,14 @@ function WifiBlock({ network, password }: { network: string; password: string })
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
         <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
-        <div style={{ color: '#fff', fontSize: network.length > 18 ? 26 : 36, fontWeight: 900 }}>{network}</div>
+        <div style={{ color: '#fff', fontSize: network.length > 18 ? 36 : 52, fontWeight: 900 }}>{network}</div>
       </div>
       {password && (
         <div>
           <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
           <div style={{
             color: '#fff',
-            fontSize: password.length > 18 ? 18 : 28,
+            fontSize: password.length > 18 ? 26 : 38,
             fontWeight: 800, fontFamily: 'monospace', letterSpacing: 3,
             background: 'rgba(200,16,46,0.18)',
             border: '1px solid rgba(200,16,46,0.4)',
@@ -371,7 +371,7 @@ function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div style={{ color: '#fff', fontSize: 54, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
+    <div style={{ color: '#fff', fontSize: 68, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
       {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
     </div>
   );
