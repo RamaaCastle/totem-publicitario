@@ -342,16 +342,16 @@ function WifiBlock({ network, password }: { network: string; password: string })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
-        <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
+        <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
         <div style={{ color: '#fff', fontSize: network.length > 18 ? 36 : 52, fontWeight: 900 }}>{network}</div>
       </div>
       {password && (
         <div>
-          <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
+          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
           <div style={{
             color: '#fff',
             fontSize: password.length > 18 ? 26 : 38,
-            fontWeight: 800, fontFamily: 'monospace', letterSpacing: 3,
+            fontWeight: 900,
             background: 'rgba(200,16,46,0.18)',
             border: '1px solid rgba(200,16,46,0.4)',
             borderRadius: 8, padding: '10px 16px', display: 'inline-block',
