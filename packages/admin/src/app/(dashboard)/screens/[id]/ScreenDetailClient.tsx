@@ -71,16 +71,19 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   const [pendingDuration, setPendingDuration] = useState(10);
 
   // ── Hotel info state (Magna TVs) ──────────────────────────────────────────
-  type HotelInfoItem = { id: string; label: string; value: string; bgImageUrl?: string };
+  type HotelInfoItem = { id: string; label: string; value: string; bgImageUrl?: string; qrImageUrl?: string };
   const [hotelInfo, setHotelInfo] = useState<HotelInfoItem[]>([]);
   const [hotelInfoLoaded, setHotelInfoLoaded] = useState(false);
   const [hotelInfoSaved, setHotelInfoSaved] = useState(false);
   const [hotelLogo, setHotelLogo] = useState<string>('');
   const [uploadingHotelLogo, setUploadingHotelLogo] = useState(false);
   const [uploadingHotelItemId, setUploadingHotelItemId] = useState<string | null>(null);
+  const [uploadingHotelQrId, setUploadingHotelQrId] = useState<string | null>(null);
   const hotelBgRef = useRef<HTMLInputElement>(null);
   const hotelLogoRef = useRef<HTMLInputElement>(null);
+  const hotelQrRef = useRef<HTMLInputElement>(null);
   const hotelBgTargetId = useRef<string | null>(null);
+  const hotelQrTargetId = useRef<string | null>(null);
 
   // ── Activity catalog state ─────────────────────────────────────────────────
   const [activities, setActivities] = useState<ActivityTemplate[]>([]);
@@ -379,6 +382,26 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     } catch { /* silent */ } finally {
       setUploadingHotelLogo(false);
       if (hotelLogoRef.current) hotelLogoRef.current.value = '';
+    }
+  };
+
+  const handleHotelQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const targetId = hotelQrTargetId.current;
+    if (!file || !targetId) return;
+    setUploadingHotelQrId(targetId);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('upload_preset', 'Pedraza');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
+      const json = await res.json();
+      if (json?.secure_url)
+        setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, qrImageUrl: json.secure_url } : i));
+    } catch { /* silent */ } finally {
+      setUploadingHotelQrId(null);
+      hotelQrTargetId.current = null;
+      if (hotelQrRef.current) hotelQrRef.current.value = '';
     }
   };
 
@@ -958,6 +981,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
             {/* Hidden file inputs */}
             <input ref={hotelLogoRef} type="file" accept="image/*" className="hidden" onChange={handleHotelLogoUpload} />
             <input ref={hotelBgRef} type="file" accept="image/*" className="hidden" onChange={handleHotelBgUpload} />
+            <input ref={hotelQrRef} type="file" accept="image/*" className="hidden" onChange={handleHotelQrUpload} />
 
             {/* Logo upload */}
             <div className="flex items-center gap-4 pb-4 mb-2 border-b border-slate-100 dark:border-slate-700">
@@ -1029,12 +1053,44 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
                       <button
                         onClick={() => setHotelInfo((prev) => prev.map((i) => i.id === item.id ? { ...i, bgImageUrl: undefined } : i))}
                         className="text-xs text-slate-400 hover:text-red-500 transition flex-shrink-0"
-                        title="Quitar imagen"
+                        title="Quitar imagen de fondo"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
+                  {/* QR upload — solo para WiFi */}
+                  {(item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi')) && (
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <button
+                        onClick={() => { hotelQrTargetId.current = item.id; hotelQrRef.current?.click(); }}
+                        disabled={uploadingHotelQrId === item.id}
+                        className="w-10 h-10 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-blue-500 bg-slate-50 dark:bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 transition"
+                        title="Subir QR del WiFi"
+                      >
+                        {uploadingHotelQrId === item.id ? (
+                          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                        ) : item.qrImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={item.qrImageUrl} alt="" className="w-full h-full object-contain p-0.5" />
+                        ) : (
+                          <span className="text-[9px] text-blue-400 font-bold text-center leading-tight">QR</span>
+                        )}
+                      </button>
+                      <span className="text-xs text-slate-400">
+                        {item.qrImageUrl ? 'QR cargado' : 'Subir QR WiFi (opcional)'}
+                      </span>
+                      {item.qrImageUrl && (
+                        <button
+                          onClick={() => setHotelInfo((prev) => prev.map((i) => i.id === item.id ? { ...i, qrImageUrl: undefined } : i))}
+                          className="text-xs text-slate-400 hover:text-red-500 transition"
+                          title="Quitar QR"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button

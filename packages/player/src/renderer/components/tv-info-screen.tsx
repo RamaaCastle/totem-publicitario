@@ -5,6 +5,7 @@ export interface HotelInfoItem {
   label: string;
   value: string;
   bgImageUrl?: string;
+  qrImageUrl?: string;
 }
 
 interface TVInfoScreenProps {
@@ -256,7 +257,7 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
 
           {/* Value */}
           {isWifi ? (
-            <WifiBlock network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} />
+            <WifiBlock network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} qrImageUrl={item.qrImageUrl} />
           ) : (
             <div style={{
               color: '#fff',
@@ -338,25 +339,53 @@ export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onCom
   );
 }
 
-function WifiBlock({ network, password }: { network: string; password: string }) {
+function WifiBlock({ network, password, qrImageUrl }: { network: string; password: string; qrImageUrl?: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
-        <div style={{ color: '#fff', fontSize: network.length > 18 ? 36 : 52, fontWeight: 900 }}>{network}</div>
-      </div>
-      {password && (
+    <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+      {/* Text info */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, flex: 1 }}>
         <div>
-          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
+          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
+          <div style={{ color: '#fff', fontSize: network.length > 18 ? 36 : 52, fontWeight: 900 }}>{network}</div>
+        </div>
+        {password && (
+          <div>
+            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
+            <div style={{
+              color: '#fff',
+              fontSize: password.length > 18 ? 26 : 38,
+              fontWeight: 900,
+              background: 'rgba(200,16,46,0.18)',
+              border: '1px solid rgba(200,16,46,0.4)',
+              borderRadius: 8, padding: '10px 16px', display: 'inline-block',
+            }}>
+              {password}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* QR code */}
+      {qrImageUrl && (
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <div style={{
-            color: '#fff',
-            fontSize: password.length > 18 ? 26 : 38,
-            fontWeight: 900,
-            background: 'rgba(200,16,46,0.18)',
-            border: '1px solid rgba(200,16,46,0.4)',
-            borderRadius: 8, padding: '10px 16px', display: 'inline-block',
+            background: '#fff',
+            borderRadius: 12,
+            padding: 8,
+            width: 140,
+            height: 140,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
-            {password}
+            <img
+              src={qrImageUrl}
+              alt="QR WiFi"
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            />
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+            Escanear
           </div>
         </div>
       )}
