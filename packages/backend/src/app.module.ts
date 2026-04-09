@@ -57,6 +57,15 @@ import { MailModule } from './modules/mail/mail.module';
       }),
     }),
 
+    // Serve player web app at /player/ — must be BEFORE admin catch-all
+    ServeStaticModule.forRoot({
+      rootPath: process.env.NODE_ENV === 'production'
+        ? join(__dirname, 'player')
+        : join(__dirname, '../../player/dist/renderer'),
+      serveRoot: '/player',
+      serveStaticOptions: { fallthrough: false },
+    }),
+
     // Serve admin panel static files
     // - production (Docker): dist/public/  (admin out copied there at build)
     // - development:         packages/admin/out/
@@ -65,15 +74,6 @@ import { MailModule } from './modules/mail/mail.module';
         ? join(__dirname, 'public')
         : join(__dirname, '../../admin/out'),
       exclude: ['/api*', '/socket.io*', '/downloads*', '/player*'],
-      serveStaticOptions: { fallthrough: true },
-    }),
-
-    // Serve player web app at /player/
-    ServeStaticModule.forRoot({
-      rootPath: process.env.NODE_ENV === 'production'
-        ? join(__dirname, 'player')
-        : join(__dirname, '../../player/dist/renderer'),
-      serveRoot: '/player',
       serveStaticOptions: { fallthrough: true },
     }),
 
