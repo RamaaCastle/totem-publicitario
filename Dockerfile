@@ -20,7 +20,7 @@ COPY packages/admin   ./packages/admin
 COPY packages/player  ./packages/player
 
 # Build admin static export (NEXT_PUBLIC_API_URL baked in at build time)
-ARG NEXT_PUBLIC_API_URL=http://187.77.53.136
+ARG NEXT_PUBLIC_API_URL=https://tv.pedraza.com.ar
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN pnpm --filter admin build

@@ -121,7 +121,15 @@ export function PlayerScreen() {
   }, [showingInfo, intercalateMode, hasTotemInfo, setCurrentIndex]);
 
   // ── TV info: onComplete fires when TVInfoScreen finishes one full cycle ──────
+  const intercalateModeRef = useRef(false);
+  intercalateModeRef.current = intercalateMode;
+
   const handleTVInfoComplete = useCallback(() => {
+    if (!intercalateModeRef.current) {
+      // No ads — loop info screen from item 0
+      setInfoCycle((c) => c + 1);
+      return;
+    }
     adsShownRef.current = 0;
     setCurrentIndex(0);
     setShowingInfo(false);
