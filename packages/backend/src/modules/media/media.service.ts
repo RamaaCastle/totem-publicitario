@@ -6,11 +6,11 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { createReadStream, unlink } from 'fs';
-import { readFile } from 'fs/promises';
 import { promisify } from 'util';
 
 import { MediaFile, MediaType, MediaStatus } from '../../database/entities/media-file.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { uploadImageToCloudinary } from '../../common/utils/cloudinary.util';
 
 const unlinkAsync = promisify(unlink);
 
@@ -57,10 +57,17 @@ export class MediaService {
     const type = this.detectMediaType(multerFile.mimetype);
     const checksum = await this.calculateChecksum(multerFile.path);
 
-    // Always upload to Cloudinary
+    // Upload to Cloudinary (images compressed with sharp, videos passed through)
     const cloudName = this.configService.get<string>('app.cloudinaryCloudName', 'dnyuwzead');
     const uploadPreset = this.configService.get<string>('app.cloudinaryUploadPreset', 'Pedraza');
-    const publicUrl = await this.uploadToCloudinary(multerFile, cloudName, uploadPreset);
+    const isImage = multerFile.mimetype.startsWith('image/');
+    const publicUrl = await uploadImageToCloudinary(
+      multerFile.path,
+      multerFile.mimetype,
+      cloudName,
+      uploadPreset,
+      isImage ? { maxWidth: 1920, maxHeight: 1920, quality: 82, format: 'jpeg' } : {},
+    );
     this.logger.log(`Uploaded media to Cloudinary: ${publicUrl}`);
 
     const mediaFile = this.mediaRepo.create({
@@ -77,31 +84,6 @@ export class MediaService {
     });
 
     return this.mediaRepo.save(mediaFile);
-  }
-
-  private async uploadToCloudinary(
-    multerFile: Express.Multer.File,
-    cloudName: string,
-    uploadPreset: string,
-  ): Promise<string> {
-    const fileBuffer = await readFile(multerFile.path);
-    const base64File = fileBuffer.toString('base64');
-    const dataUri = `data:${multerFile.mimetype};base64,${base64File}`;
-
-    const formData = new FormData();
-    formData.append('file', dataUri);
-    formData.append('upload_preset', uploadPreset);
-
-    const url = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
-    const response = await fetch(url, { method: 'POST', body: formData });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new BadRequestException(`Cloudinary upload failed: ${text}`);
-    }
-
-    const data: any = await response.json();
-    return data.secure_url as string;
   }
 
   async remove(id: string, organizationId: string): Promise<void> {
