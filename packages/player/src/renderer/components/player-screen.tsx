@@ -126,7 +126,8 @@ export function PlayerScreen() {
 
   const handleTVInfoComplete = useCallback(() => {
     if (!intercalateModeRef.current) {
-      // No ads — CSS infinite scroll handles looping, nothing to do
+      // No ads — loop info screen from item 0
+      setInfoCycle((c) => c + 1);
       return;
     }
     adsShownRef.current = 0;
