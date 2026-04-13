@@ -36,29 +36,34 @@ export async function uploadImageToCloudinary(
 
   let dataUri: string;
 
+  const buf = Buffer.isBuffer(input) ? input : await import('fs/promises').then(fs => fs.readFile(input as string));
+
   if (isVideo) {
-    // Videos: no compression (would need ffmpeg) — pass through as-is
-    const buf = Buffer.isBuffer(input) ? input : await import('fs/promises').then(fs => fs.readFile(input as string));
+    // Videos: no compression — pass through as-is
     dataUri = `data:${mimeType};base64,${buf.toString('base64')}`;
   } else {
-    // Images: compress with sharp
-    const buf = Buffer.isBuffer(input) ? input : await import('fs/promises').then(fs => fs.readFile(input as string));
+    // Images: compress with sharp (no mozjpeg — not available on Alpine)
+    try {
+      let pipeline = sharp(buf).resize(maxWidth, maxHeight, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
 
-    let pipeline = sharp(buf).resize(maxWidth, maxHeight, {
-      fit: 'inside',      // never upscale
-      withoutEnlargement: true,
-    });
+      if (format === 'jpeg') pipeline = pipeline.jpeg({ quality });
+      else if (format === 'webp') pipeline = pipeline.webp({ quality });
+      else pipeline = pipeline.png({ compressionLevel: 7 });
 
-    if (format === 'jpeg') pipeline = pipeline.jpeg({ quality, mozjpeg: true });
-    else if (format === 'webp') pipeline = pipeline.webp({ quality });
-    else pipeline = pipeline.png({ compressionLevel: 8, effort: 10 });
+      const compressed = await pipeline.toBuffer();
+      const outMime = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+      dataUri = `data:${outMime};base64,${compressed.toString('base64')}`;
 
-    const compressed = await pipeline.toBuffer();
-    const outMime = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
-    dataUri = `data:${outMime};base64,${compressed.toString('base64')}`;
-
-    const savedPct = Math.round((1 - compressed.length / buf.length) * 100);
-    logger.log(`Compressed image: ${buf.length >> 10}KB → ${compressed.length >> 10}KB (${savedPct}% saved)`);
+      const savedPct = Math.round((1 - compressed.length / buf.length) * 100);
+      logger.log(`Compressed image: ${buf.length >> 10}KB → ${compressed.length >> 10}KB (${savedPct}% saved)`);
+    } catch (err) {
+      // If sharp fails for any reason, fall back to uploading the original
+      logger.warn(`sharp compression failed, uploading original: ${err.message}`);
+      dataUri = `data:${mimeType};base64,${buf.toString('base64')}`;
+    }
   }
 
   const formData = new FormData();
