@@ -1,7 +1,7 @@
 // ── Cloudinary config ─────────────────────────────────────────────────────────
 // Change account by setting these env vars (requires rebuild)
-const CLOUD  = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD  ?? 'dnyuwzead';
-const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_PRESET ?? 'Pedraza';
+const CLOUD  = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD  ?? 'dy4kekwzh';
+const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_PRESET ?? 'ml_default';
 
 // ── Client-side compression (Canvas API — no extra deps) ──────────────────────
 interface CompressOpts {

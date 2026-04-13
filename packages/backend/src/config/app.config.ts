@@ -14,9 +14,9 @@ export default registerAs('app', () => ({
   allowedVideoTypes: (process.env.ALLOWED_VIDEO_TYPES || 'video/mp4,video/webm').split(','),
   storageProvider: process.env.STORAGE_PROVIDER || 'local',
   logLevel: process.env.LOG_LEVEL || 'debug',
-  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || 'dnyuwzead',
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || 'dy4kekwzh',
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || '',
-  cloudinaryUploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'Pedraza',
+  cloudinaryUploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'ml_default',
   cloudinaryOrgSlugs: (process.env.CLOUDINARY_ORG_SLUGS || '').split(',').map(s => s.trim()).filter(Boolean),
 }));
