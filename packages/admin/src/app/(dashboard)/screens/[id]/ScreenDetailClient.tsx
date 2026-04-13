@@ -10,6 +10,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 import { useOrgStore } from '@/stores/org.store';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -354,13 +355,9 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file || !targetId) return;
     setUploadingHotelItemId(targetId);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('upload_preset', 'Pedraza');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
-      const json = await res.json();
-      if (json?.secure_url)
-        setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, bgImageUrl: json.secure_url } : i));
+      // TV background: max 1920×1080, JPEG, quality 80%
+      const url = await uploadToCloudinary(file, { maxWidth: 1920, maxHeight: 1080, quality: 0.80 });
+      setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, bgImageUrl: url } : i));
     } catch { /* silent */ } finally {
       setUploadingHotelItemId(null);
       hotelBgTargetId.current = null;
@@ -373,12 +370,9 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file) return;
     setUploadingHotelLogo(true);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('upload_preset', 'Pedraza');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
-      const json = await res.json();
-      if (json?.secure_url) setHotelLogo(json.secure_url);
+      // Logo: max 600×200, keep PNG transparency, quality 88%
+      const url = await uploadToCloudinary(file, { maxWidth: 600, maxHeight: 200, quality: 0.88, keepPng: true });
+      setHotelLogo(url);
     } catch { /* silent */ } finally {
       setUploadingHotelLogo(false);
       if (hotelLogoRef.current) hotelLogoRef.current.value = '';
@@ -391,13 +385,9 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file || !targetId) return;
     setUploadingHotelQrId(targetId);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('upload_preset', 'Pedraza');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dnyuwzead/image/upload', { method: 'POST', body: form });
-      const json = await res.json();
-      if (json?.secure_url)
-        setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, qrImageUrl: json.secure_url } : i));
+      // QR code: max 500×500, keep PNG (sharp edges), quality 92%
+      const url = await uploadToCloudinary(file, { maxWidth: 500, maxHeight: 500, quality: 0.92, keepPng: true });
+      setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, qrImageUrl: url } : i));
     } catch { /* silent */ } finally {
       setUploadingHotelQrId(null);
       hotelQrTargetId.current = null;
@@ -480,17 +470,9 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file) return;
     setUploadingActivityImg(true);
     try {
-      const cloudName = 'dnyuwzead';
-      const uploadPreset = 'Pedraza';
-      const form = new FormData();
-      form.append('file', file);
-      form.append('upload_preset', uploadPreset);
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: form,
-      });
-      const json = await res.json();
-      if (json?.secure_url) setActivityFormImageUrl(json.secure_url);
+      // Activity image: max 1200×900, JPEG, quality 82%
+      const url = await uploadToCloudinary(file, { maxWidth: 1200, maxHeight: 900, quality: 0.82 });
+      setActivityFormImageUrl(url);
     } catch { /* silent */ } finally {
       setUploadingActivityImg(false);
       if (activityImgRef.current) activityImgRef.current.value = '';

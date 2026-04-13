@@ -41,6 +41,8 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://tv.pedraza.com.ar
+        NEXT_PUBLIC_CLOUDINARY_CLOUD: ${NEXT_PUBLIC_CLOUDINARY_CLOUD:-dnyuwzead}
+        NEXT_PUBLIC_CLOUDINARY_PRESET: ${NEXT_PUBLIC_CLOUDINARY_PRESET:-Pedraza}
     container_name: signage_app
     restart: unless-stopped
     depends_on:
