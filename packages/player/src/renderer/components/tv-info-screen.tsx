@@ -15,9 +15,7 @@ interface TVInfoScreenProps {
   onComplete?: () => void;
 }
 
-const SLIDE_MS = 5000;
-const ANIM_MS  = 380;
-const TICK_MS  = 200;
+const SLIDE_MS = 6000;
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 function nowMinutes(): number {
@@ -47,7 +45,7 @@ function formatDiff(diffMin: number): string {
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
 
-type TimeStatus = { type: 'active' | 'soon' | 'exact'; label: string } | null;
+type TimeStatus = { type: 'active' | 'soon'; label: string } | null;
 
 function getTimeStatus(value: string): TimeStatus {
   const now = nowMinutes();
@@ -71,293 +69,254 @@ function getTimeStatus(value: string): TimeStatus {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function TVInfoScreen({ items, logoUrl, slideDurationMs = SLIDE_MS, onComplete }: TVInfoScreenProps) {
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [phase, setPhase]           = useState<'enter' | 'idle' | 'exit'>('enter');
-  const [logoError, setLogoError]   = useState(false);
-  const [, setTick]                  = useState(0); // forces re-calc of status each minute
+  const [logoError, setLogoError] = useState(false);
+  const [, setTick]               = useState(0);
+  const onCompleteRef             = useRef(onComplete);
+  onCompleteRef.current           = onComplete;
 
-  const onCompleteRef  = useRef(onComplete);
-  const slideStartRef  = useRef(Date.now());
-  const advancingRef   = useRef(false);
-  const currentIdxRef  = useRef(0);
-  onCompleteRef.current  = onComplete;
-  currentIdxRef.current  = currentIdx;
+  const total          = items.length;
+  const cycleDurationMs = total * slideDurationMs;
 
-  const total = items.length;
-
-  // Clock tick for status badge
+  // Clock tick for status badges
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 15000);
     return () => clearInterval(t);
   }, []);
 
-  // Reset on slide change
+  // Notify parent after each full scroll cycle
   useEffect(() => {
     if (total === 0) return;
-    advancingRef.current  = false;
-    slideStartRef.current = Date.now();
-    setPhase('enter');
-    const t = setTimeout(() => setPhase('idle'), ANIM_MS);
-    return () => clearTimeout(t);
-  }, [currentIdx, total]);
-
-  // Advance logic (interval-based — survives Android background throttling)
-  useEffect(() => {
-    if (total === 0) return;
-
-    const advance = () => {
-      if (advancingRef.current) return;
-      advancingRef.current = true;
-      const next = (currentIdxRef.current + 1) % total;
-
-      if (next === 0) {
-        // Last item done — notify parent immediately (no fade so no frozen bg)
-        onCompleteRef.current?.();
-      } else {
-        setPhase('exit');
-        setTimeout(() => setCurrentIdx(next), ANIM_MS);
-      }
-    };
-
-    const interval = setInterval(() => {
-      if (advancingRef.current) return;
-      if (Date.now() - slideStartRef.current >= slideDurationMs) advance();
-    }, TICK_MS);
-
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible' || advancingRef.current) return;
-      if (Date.now() - slideStartRef.current >= slideDurationMs) {
-        advance();
-      } else {
-        setPhase('enter');
-        setTimeout(() => setPhase('idle'), ANIM_MS);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
-  }, [total, slideDurationMs]);
+    const t = setInterval(() => onCompleteRef.current?.(), cycleDurationMs);
+    return () => clearInterval(t);
+  }, [total, cycleDurationMs]);
 
   useEffect(() => { setLogoError(false); }, [logoUrl]);
 
   if (total === 0) return null;
 
-  const item      = items[currentIdx];
-  const isWifi    = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
-  const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
-  const status    = isWifi ? null : getTimeStatus(item.value);
-  const showLogo  = !!logoUrl && !logoError;
-
-  const panelX = phase === 'enter' ? '-32px' : phase === 'exit' ? '-32px' : '0px';
-  const panelO = phase === 'idle' ? 1 : 0;
-
-  const valueLen = item.value.length;
-  const valueFontSize = valueLen > 22 ? 52 : valueLen > 14 ? 68 : valueLen > 8 ? 86 : 104;
+  const showLogo = !!logoUrl && !logoError;
+  const doubled  = [...items, ...items]; // duplicated for seamless CSS loop
 
   return (
     <div style={{
       width: '100vw', height: '100vh',
-      position: 'relative', overflow: 'hidden',
-      fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
-      background: '#0d0d0d',
+      background: '#080808',
+      fontFamily: '"Montserrat", "Segoe UI", system-ui, sans-serif',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      color: '#fff',
+      position: 'relative',
     }}>
       <style>{`
-        @keyframes tv-prog { from{width:0%} to{width:100%} }
-        @keyframes tv-bg   { from{opacity:0;transform:scale(1.05)} to{opacity:1;transform:scale(1)} }
-        @keyframes tv-pulse{ 0%,100%{opacity:1} 50%{opacity:.6} }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
+        @keyframes tv-scroll {
+          0%   { transform: translateY(0); }
+          100% { transform: translateY(-50%); }
+        }
+        @keyframes tv-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.4; }
+        }
       `}</style>
 
-      {/* Background */}
-      <div
-        key={item.id + '-bg'}
-        style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: item.bgImageUrl ? `url(${item.bgImageUrl})` : 'none',
-          backgroundColor: item.bgImageUrl ? 'transparent' : '#181818',
-          backgroundSize: 'cover', backgroundPosition: 'center',
-          animation: 'tv-bg 0.9s ease forwards',
-        }}
-      />
-      {/* Right-side vignette to keep bg visible but not competing */}
+      {/* ── Header ── */}
       <div style={{
-        position: 'absolute', inset: 0,
-        background: 'linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 55%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* ── LEFT PANEL ── */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, bottom: 0,
-        width: 600,
-        background: 'rgba(0,0,0,0.72)',
-        display: 'flex', flexDirection: 'column',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        opacity: panelO,
-        transform: `translateX(${panelX})`,
-        transition: `opacity ${ANIM_MS}ms ease, transform ${ANIM_MS}ms cubic-bezier(0.22,1,0.36,1)`,
+        flexShrink: 0,
+        padding: '40px 48px 32px',
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        gap: 20,
+        zIndex: 3,
+        background: '#080808',
       }}>
-
-        {/* Red top stripe */}
-        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
-
-        {/* Logo */}
-        {showLogo && (
-          <div style={{
-            padding: '22px 32px 18px', flexShrink: 0,
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {showLogo && (
             <img
               src={logoUrl}
               alt=""
               onError={() => setLogoError(true)}
               style={{
-                maxWidth: 220, maxHeight: 64,
+                maxWidth: 150, maxHeight: 50,
                 objectFit: 'contain', display: 'block',
-                filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.8))',
+                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.7))',
               }}
             />
-          </div>
-        )}
-
-        {/* Clock */}
-        <div style={{
-          padding: showLogo ? '16px 32px 0' : '28px 32px 0',
-          flexShrink: 0,
-        }}>
+          )}
           <ClockDisplay />
-          <div style={{
-            color: 'rgba(255,255,255,0.28)', fontSize: 9,
-            fontWeight: 800, letterSpacing: 5, textTransform: 'uppercase', marginTop: 4,
-          }}>
-            Información del hotel
-          </div>
         </div>
 
-        {/* Separator */}
-        <div style={{ margin: '18px 32px 0', height: 1, background: 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
-
-        {/* ── Content ── */}
-        <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          justifyContent: 'center', padding: '0 32px', gap: 12,
-        }}>
-
-          {/* Label */}
-          <div style={{
-            color: 'rgba(255,255,255,0.85)',
-            fontSize: 36, fontWeight: 800,
-            letterSpacing: 2, textTransform: 'uppercase',
-          }}>
-            {item.label}
-          </div>
-
-          {/* Red accent */}
-          <div style={{ width: 36, height: 3, background: '#c8102e', borderRadius: 2 }} />
-
-          {/* Value */}
-          {isWifi ? (
-            <WifiBlock network={wifiParts[0] ?? item.value} password={wifiParts[1] ?? ''} qrImageUrl={item.qrImageUrl} />
-          ) : (
-            <div style={{
-              color: '#fff',
-              fontSize: valueFontSize,
-              fontWeight: 900, lineHeight: 1.05, letterSpacing: -1,
-            }}>
-              {item.value}
-            </div>
-          )}
-
-          {/* Status badge */}
-          {status && (
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: status.type === 'active'
-                ? 'rgba(34,197,94,0.18)'
-                : 'rgba(251,191,36,0.18)',
-              border: `1px solid ${status.type === 'active' ? 'rgba(34,197,94,0.5)' : 'rgba(251,191,36,0.5)'}`,
-              borderRadius: 50, padding: '6px 16px',
-              alignSelf: 'flex-start', marginTop: 4,
-            }}>
-              {/* Pulsing dot */}
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: status.type === 'active' ? '#22c55e' : '#fbbf24',
-                animation: status.type === 'active' ? 'tv-pulse 1.5s ease infinite' : 'none',
-              }} />
-              <span style={{
-                color: status.type === 'active' ? '#4ade80' : '#fde68a',
-                fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
-              }}>
-                {status.label}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Dots + progress */}
-        <div style={{ padding: '0 32px 28px', flexShrink: 0 }}>
-          {total > 1 && (
-            <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
-              {items.map((_, i) => (
-                <div key={i} style={{
-                  height: 3,
-                  flex: i === currentIdx ? 3 : 1,
-                  borderRadius: 2,
-                  background: i === currentIdx ? '#c8102e' : 'rgba(255,255,255,0.13)',
-                  transition: 'flex 0.4s ease',
-                }} />
-              ))}
-            </div>
-          )}
-          <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, overflow: 'hidden' }}>
-            <div
-              key={`prog-${currentIdx}`}
-              style={{
-                height: '100%', background: '#c8102e', width: '0%',
-                animation: `tv-prog ${slideDurationMs}ms linear forwards`,
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Red bottom stripe */}
-        <div style={{ height: 4, background: '#c8102e', flexShrink: 0 }} />
+        {/* Red vertical accent */}
+        <div style={{ width: 3, height: 72, background: '#c8102e', borderRadius: 2, flexShrink: 0 }} />
       </div>
 
-      {/* Slide counter top-right */}
-      {total > 1 && (
+      {/* Thin rule */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', flexShrink: 0, margin: '0 48px' }} />
+
+      {/* ── Scroll area ── */}
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+
+        {/* Fade top */}
         <div style={{
-          position: 'absolute', top: 20, right: 24,
-          color: 'rgba(255,255,255,0.35)', fontSize: 12,
-          fontWeight: 700, letterSpacing: 2,
+          position: 'absolute', top: 0, left: 0, right: 0, height: 56, zIndex: 2,
+          background: 'linear-gradient(to bottom, #080808 0%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        {/* Fade bottom */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 2,
+          background: 'linear-gradient(to top, #080808 0%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Scrolling track */}
+        <div
+          key={cycleDurationMs}
+          style={{
+            animation: `tv-scroll ${cycleDurationMs}ms linear infinite`,
+            willChange: 'transform',
+          }}
+        >
+          {doubled.map((item, i) => (
+            <InfoItem key={`${item.id}-${i}`} item={item} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Single info item ──────────────────────────────────────────────────────────
+function InfoItem({ item }: { item: HotelInfoItem }) {
+  const isWifi    = item.label.toLowerCase().includes('wifi') || item.label.toLowerCase().includes('wi-fi');
+  const wifiParts = isWifi ? item.value.split('|').map((s) => s.trim()) : [];
+  const status    = isWifi ? null : getTimeStatus(item.value);
+
+  const valueLen = item.value.length;
+  const valueFontSize =
+    valueLen > 22 ? '7vw'  :
+    valueLen > 14 ? '9vw'  :
+    valueLen > 8  ? '12vw' : '15vw';
+
+  return (
+    <div style={{
+      position: 'relative',
+      minHeight: '42vh',
+      padding: '44px 48px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      gap: 18,
+      borderBottom: '1px solid rgba(255,255,255,0.04)',
+      overflow: 'hidden',
+    }}>
+      {/* Background image — very subtle */}
+      {item.bgImageUrl && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${item.bgImageUrl})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          opacity: 0.12,
+        }} />
+      )}
+
+      {/* Label */}
+      <div style={{
+        fontSize: 11, fontWeight: 700,
+        letterSpacing: 6, textTransform: 'uppercase',
+        color: '#c8102e',
+        position: 'relative',
+      }}>
+        {item.label}
+      </div>
+
+      {/* Value */}
+      {isWifi ? (
+        <WifiBlock
+          network={wifiParts[0] ?? item.value}
+          password={wifiParts[1] ?? ''}
+          qrImageUrl={item.qrImageUrl}
+        />
+      ) : (
+        <div style={{
+          fontSize: valueFontSize,
+          fontWeight: 800,
+          lineHeight: 1.05,
+          letterSpacing: '-0.02em',
+          color: '#fff',
+          position: 'relative',
         }}>
-          {currentIdx + 1} / {total}
+          {item.value}
+        </div>
+      )}
+
+      {/* Status badge */}
+      {status && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: status.type === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)',
+          border: `1px solid ${status.type === 'active' ? 'rgba(34,197,94,0.25)' : 'rgba(251,191,36,0.25)'}`,
+          borderRadius: 50, padding: '6px 16px',
+          alignSelf: 'flex-start',
+          position: 'relative',
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: status.type === 'active' ? '#22c55e' : '#fbbf24',
+            animation: status.type === 'active' ? 'tv-pulse 1.5s ease infinite' : 'none',
+          }} />
+          <span style={{
+            fontSize: 13, fontWeight: 700, letterSpacing: 1,
+            color: status.type === 'active' ? '#4ade80' : '#fde68a',
+          }}>
+            {status.label}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
+// ── WiFi block ────────────────────────────────────────────────────────────────
 function WifiBlock({ network, password, qrImageUrl }: { network: string; password: string; qrImageUrl?: string }) {
   return (
-    <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-      {/* Text info */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, flex: 1 }}>
+    <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', position: 'relative' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, flex: 1 }}>
         <div>
-          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Red</div>
-          <div style={{ color: '#fff', fontSize: network.length > 18 ? 36 : 52, fontWeight: 900 }}>{network}</div>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: 5,
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)',
+            marginBottom: 8,
+          }}>
+            Red
+          </div>
+          <div style={{
+            fontSize: network.length > 18 ? '5vw' : '7vw',
+            fontWeight: 800, color: '#fff', lineHeight: 1.1,
+          }}>
+            {network}
+          </div>
         </div>
+
         {password && (
           <div>
-            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Contraseña</div>
             <div style={{
-              color: '#fff',
-              fontSize: password.length > 18 ? 26 : 38,
-              fontWeight: 900,
-              background: 'rgba(200,16,46,0.18)',
-              border: '1px solid rgba(200,16,46,0.4)',
-              borderRadius: 8, padding: '10px 16px', display: 'inline-block',
+              fontSize: 10, fontWeight: 700, letterSpacing: 5,
+              textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)',
+              marginBottom: 8,
+            }}>
+              Contraseña
+            </div>
+            <div style={{
+              fontSize: password.length > 18 ? '4vw' : '5.5vw',
+              fontWeight: 700, color: '#fff',
+              background: 'rgba(200,16,46,0.12)',
+              border: '1px solid rgba(200,16,46,0.25)',
+              borderRadius: 8, padding: '10px 20px',
+              display: 'inline-block',
+              letterSpacing: 2,
             }}>
               {password}
             </div>
@@ -365,18 +324,12 @@ function WifiBlock({ network, password, qrImageUrl }: { network: string; passwor
         )}
       </div>
 
-      {/* QR code */}
       {qrImageUrl && (
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <div style={{
-            background: '#fff',
-            borderRadius: 12,
-            padding: 8,
-            width: 140,
-            height: 140,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            background: '#fff', borderRadius: 12, padding: 10,
+            width: 130, height: 130,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <img
               src={qrImageUrl}
@@ -384,7 +337,10 @@ function WifiBlock({ network, password, qrImageUrl }: { network: string; passwor
               style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             />
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: 3,
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)',
+          }}>
             Escanear
           </div>
         </div>
@@ -393,6 +349,7 @@ function WifiBlock({ network, password, qrImageUrl }: { network: string; passwor
   );
 }
 
+// ── Clock ─────────────────────────────────────────────────────────────────────
 function ClockDisplay() {
   const [time, setTime] = useState(() => new Date());
   useEffect(() => {
@@ -400,7 +357,14 @@ function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div style={{ color: '#fff', fontSize: 68, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>
+    <div style={{
+      color: '#fff',
+      fontSize: '11vw',
+      fontWeight: 800,
+      letterSpacing: '-0.03em',
+      lineHeight: 1,
+      fontFamily: '"Montserrat", sans-serif',
+    }}>
       {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
     </div>
   );
