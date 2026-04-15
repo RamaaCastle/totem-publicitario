@@ -66,22 +66,20 @@ import { MailModule } from './modules/mail/mail.module';
       serveStaticOptions: { fallthrough: false },
     }),
 
-    // Serve admin panel static files
-    // - production (Docker): dist/public/  (admin out copied there at build)
-    // - development:         packages/admin/out/
-    ServeStaticModule.forRoot({
-      rootPath: process.env.NODE_ENV === 'production'
-        ? join(__dirname, 'public')
-        : join(__dirname, '../../admin/out'),
-      exclude: ['/api*', '/socket.io*', '/downloads*', '/player*'],
-      serveStaticOptions: { fallthrough: true },
-    }),
-
-    // Serve uploaded media files at /uploads/
+    // Serve uploaded media files at /uploads/ — must be BEFORE admin catch-all
     ServeStaticModule.forRoot({
       rootPath: resolve(process.env.UPLOAD_DIR || join(__dirname, '..', 'uploads')),
       serveRoot: '/uploads',
       serveStaticOptions: { fallthrough: false },
+    }),
+
+    // Serve admin panel static files
+    ServeStaticModule.forRoot({
+      rootPath: process.env.NODE_ENV === 'production'
+        ? join(__dirname, 'public')
+        : join(__dirname, '../../admin/out'),
+      exclude: ['/api*', '/socket.io*', '/downloads*', '/player*', '/uploads*'],
+      serveStaticOptions: { fallthrough: true },
     }),
 
     // Serve APK downloads from /downloads/ path (EasyPanel volume: /app/downloads)
