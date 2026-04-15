@@ -6,11 +6,13 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { createReadStream, unlink } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
+import { resolve, relative } from 'path';
 import { promisify } from 'util';
+import sharp from 'sharp';
 
 import { MediaFile, MediaType, MediaStatus } from '../../database/entities/media-file.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { uploadImageToCloudinary } from '../../common/utils/cloudinary.util';
 
 const unlinkAsync = promisify(unlink);
 
@@ -54,30 +56,42 @@ export class MediaService {
     organizationId: string,
     uploadedById: string,
   ): Promise<MediaFile> {
-    const type = this.detectMediaType(multerFile.mimetype);
-    const checksum = await this.calculateChecksum(multerFile.path);
+    const type      = this.detectMediaType(multerFile.mimetype);
+    const isImage   = multerFile.mimetype.startsWith('image/');
+    const appUrl    = this.configService.get<string>('app.url', 'http://localhost:3001');
+    const uploadDir = this.configService.get<string>('app.uploadDir', './uploads');
 
-    // Upload to Cloudinary (images compressed with sharp, videos passed through)
-    const cloudName = this.configService.get<string>('app.cloudinaryCloudName', 'dnyuwzead');
-    const uploadPreset = this.configService.get<string>('app.cloudinaryUploadPreset', 'Pedraza');
-    const isImage = multerFile.mimetype.startsWith('image/');
-    const publicUrl = await uploadImageToCloudinary(
-      multerFile.path,
-      multerFile.mimetype,
-      cloudName,
-      uploadPreset,
-      isImage ? { maxWidth: 1920, maxHeight: 1920, quality: 82, format: 'jpeg' } : {},
-    );
-    this.logger.log(`Uploaded media to Cloudinary: ${publicUrl}`);
+    // Compress images with sharp before storing
+    if (isImage) {
+      try {
+        const buf = await readFile(multerFile.path);
+        const compressed = await sharp(buf)
+          .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 82 })
+          .toBuffer();
+        await writeFile(multerFile.path, compressed);
+        this.logger.log(`Compressed: ${buf.length >> 10}KB → ${compressed.length >> 10}KB`);
+      } catch (err: any) {
+        this.logger.warn(`sharp compression failed, keeping original: ${err?.message}`);
+      }
+    }
+
+    // Build public URL relative to upload dir
+    const absUploadDir = resolve(uploadDir);
+    const absFilePath  = resolve(multerFile.path);
+    const relativePath = relative(absUploadDir, absFilePath).replace(/\\/g, '/');
+    const publicUrl    = `${appUrl}/uploads/${relativePath}`;
+
+    const checksum = await this.calculateChecksum(multerFile.path);
 
     const mediaFile = this.mediaRepo.create({
       originalName: multerFile.originalname,
-      storagePath: multerFile.path,
+      storagePath:  multerFile.path,
       publicUrl,
       type,
-      mimeType: multerFile.mimetype,
-      sizeBytes: multerFile.size,
-      status: MediaStatus.READY,
+      mimeType:     multerFile.mimetype,
+      sizeBytes:    multerFile.size,
+      status:       MediaStatus.READY,
       checksum,
       organizationId,
       uploadedById,
@@ -89,11 +103,11 @@ export class MediaService {
   async remove(id: string, organizationId: string): Promise<void> {
     const file = await this.findOne(id, organizationId);
 
-    // Delete physical file
+    // Delete physical file from disk
     try {
       await unlinkAsync(file.storagePath);
-    } catch (err) {
-      this.logger.warn(`Could not delete file ${file.storagePath}: ${err.message}`);
+    } catch (err: any) {
+      this.logger.warn(`Could not delete file ${file.storagePath}: ${err?.message}`);
     }
 
     await this.mediaRepo.remove(file);
@@ -107,10 +121,10 @@ export class MediaService {
 
   private calculateChecksum(filePath: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const hash = createHash('sha256');
+      const hash   = createHash('sha256');
       const stream = createReadStream(filePath);
-      stream.on('data', (chunk) => hash.update(chunk));
-      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('data', (chunk: any) => hash.update(chunk));
+      stream.on('end',  () => resolve(hash.digest('hex')));
       stream.on('error', reject);
     });
   }

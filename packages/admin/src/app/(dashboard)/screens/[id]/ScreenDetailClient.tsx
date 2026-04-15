@@ -10,7 +10,6 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
-import { uploadToCloudinary } from '@/lib/cloudinary';
 import { useOrgStore } from '@/stores/org.store';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -349,14 +348,24 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
   });
 
   // ── Hotel info mutations + helpers ────────────────────────────────────────
+  const uploadFileToServer = async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await apiClient.post('/api/v1/media/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    const url = res.data?.data?.publicUrl ?? res.data?.publicUrl;
+    if (!url) throw new Error('No URL returned from server');
+    return url;
+  };
+
   const handleHotelBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const targetId = hotelBgTargetId.current;
     if (!file || !targetId) return;
     setUploadingHotelItemId(targetId);
     try {
-      // TV background: max 1920×1080, JPEG, quality 80%
-      const url = await uploadToCloudinary(file, { maxWidth: 1920, maxHeight: 1080, quality: 0.80 });
+      const url = await uploadFileToServer(file);
       setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, bgImageUrl: url } : i));
     } catch { /* silent */ } finally {
       setUploadingHotelItemId(null);
@@ -370,8 +379,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file) return;
     setUploadingHotelLogo(true);
     try {
-      // Logo: max 600×200, keep PNG transparency, quality 88%
-      const url = await uploadToCloudinary(file, { maxWidth: 600, maxHeight: 200, quality: 0.88, keepPng: true });
+      const url = await uploadFileToServer(file);
       setHotelLogo(url);
     } catch { /* silent */ } finally {
       setUploadingHotelLogo(false);
@@ -385,8 +393,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     if (!file || !targetId) return;
     setUploadingHotelQrId(targetId);
     try {
-      // QR code: max 500×500, keep PNG (sharp edges), quality 92%
-      const url = await uploadToCloudinary(file, { maxWidth: 500, maxHeight: 500, quality: 0.92, keepPng: true });
+      const url = await uploadFileToServer(file);
       setHotelInfo((prev) => prev.map((i) => i.id === targetId ? { ...i, qrImageUrl: url } : i));
     } catch { /* silent */ } finally {
       setUploadingHotelQrId(null);
@@ -471,7 +478,7 @@ export default function ScreenDetailClient({ params }: { params: { id: string } 
     setUploadingActivityImg(true);
     try {
       // Activity image: max 1200×900, JPEG, quality 82%
-      const url = await uploadToCloudinary(file, { maxWidth: 1200, maxHeight: 900, quality: 0.82 });
+      const url = await uploadFileToServer(file);
       setActivityFormImageUrl(url);
     } catch { /* silent */ } finally {
       setUploadingActivityImg(false);

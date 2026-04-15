@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_GUARD } from '@nestjs/core';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
@@ -75,6 +75,13 @@ import { MailModule } from './modules/mail/mail.module';
         : join(__dirname, '../../admin/out'),
       exclude: ['/api*', '/socket.io*', '/downloads*', '/player*'],
       serveStaticOptions: { fallthrough: true },
+    }),
+
+    // Serve uploaded media files at /uploads/
+    ServeStaticModule.forRoot({
+      rootPath: resolve(process.env.UPLOAD_DIR || join(__dirname, '..', 'uploads')),
+      serveRoot: '/uploads',
+      serveStaticOptions: { fallthrough: false },
     }),
 
     // Serve APK downloads from /downloads/ path (EasyPanel volume: /app/downloads)

@@ -2,8 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { readFile, writeFile } from 'fs/promises';
+import { resolve, relative } from 'path';
+import sharp from 'sharp';
 import { Organization } from '../../database/entities/organization.entity';
-import { uploadImageToCloudinary } from '../../common/utils/cloudinary.util';
 import { Screen, ScreenStatus } from '../../database/entities/screen.entity';
 import { MediaFile } from '../../database/entities/media-file.entity';
 
@@ -41,16 +43,22 @@ export class OrganizationsService {
   }
 
   async uploadLogo(organizationId: string, file: Express.Multer.File): Promise<Organization> {
-    const cloudName = this.configService.get<string>('app.cloudinaryCloudName', 'dnyuwzead');
-    const uploadPreset = this.configService.get<string>('app.cloudinaryUploadPreset', 'Pedraza');
-    // Logo: max 600×200, PNG to preserve transparency, quality 88
-    const logoUrl = await uploadImageToCloudinary(
-      file.path,
-      file.mimetype,
-      cloudName,
-      uploadPreset,
-      { maxWidth: 600, maxHeight: 200, quality: 88, format: 'png' },
-    );
+    const appUrl    = this.configService.get<string>('app.url', 'http://localhost:3001');
+    const uploadDir = this.configService.get<string>('app.uploadDir', './uploads');
+
+    // Compress logo (PNG to preserve transparency)
+    try {
+      const buf = await readFile(file.path);
+      const compressed = await sharp(buf)
+        .resize(600, 200, { fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 7 })
+        .toBuffer();
+      await writeFile(file.path, compressed);
+    } catch (_err: any) { /* keep original if sharp fails */ }
+
+    const relativePath = relative(resolve(uploadDir), resolve(file.path)).replace(/\\/g, '/');
+    const logoUrl = `${appUrl}/uploads/${relativePath}`;
+
     return this.updateMe(organizationId, { logoUrl });
   }
 
